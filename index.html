@@ -154,6 +154,7 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
       <button class="btn" id="btnExpX" type="button">Exportar Excel</button>
       <button class="btn primary" id="btnNovaFicha" type="button">+ Nova ficha</button>
     </div>
+    <div class="section" id="syncBanner" hidden></div>
     <div class="section fichas" id="listFichas"></div>
   </section>
 
@@ -387,9 +388,10 @@ function parseCfg(t){
 }
 function headerOnly(f){const {reg,exemplo,...h}=f;return h}
 function setStatus(kind,txt){
-  netState=kind;
+  const prev=netState; netState=kind;
   ["syncDot","sDot"].forEach(id=>{$(id).className="dot"+(kind?" "+kind:"")});
   $("syncTxt").textContent=txt; $("sState").textContent=txt;
+  if(prev!==kind&&$("syncBanner")&&!$("vList").hidden)syncBanner();
 }
 function rebuild(){
   if(!(gotF&&gotR))return;
@@ -413,7 +415,7 @@ function connect(cfg,equipa){
     unsubs.forEach(u=>u());unsubs=[];cloudF={};cloudR={};gotF=gotR=false;
     base=db.collection(COL).doc(equipa); MODE="cloud"; DB={fichas:[]}; cur=null;
     setStatus("wait","A ligar à equipa "+equipa+"…");
-    const onErr=e=>{setStatus("off","Erro de acesso: "+(e.code||e.message));};
+    const onErr=e=>{setStatus("off",e.code==="permission-denied"?"Sem permissão: faltam as regras SOS Cagarro no Firebase":"Erro de ligação: "+(e.code||e.message));if(!$("vList").hidden)renderList()};
     const meta=s=>{ if(s.metadata.hasPendingWrites)setStatus("wait","A enviar alterações…");
       else if(s.metadata.fromCache)setStatus("wait","Sem rede · guardado neste equipamento");
       else setStatus("on","Sincronizado · "+equipa)};
@@ -473,7 +475,19 @@ function chipsHTML(f){const c=counts(f);return `<span class="chip">${f.reg.lengt
 
 /* ---- vistas ---- */
 function showList(){cur=null;$("vFicha").hidden=true;$("vRel").hidden=true;$("vList").hidden=false;renderList();window.scrollTo(0,0)}
+function syncBanner(){
+  const B=$("syncBanner");if(!B)return;let h="";
+  if(MODE==="cloud"&&netState==="off")h=`<div class="confirm" style="border-color:var(--bad)"><span style="flex:1"><b>${esc($("syncTxt").textContent)}.</b> Os registos não estão a ser partilhados com os outros equipamentos.</span><button class="btn" type="button" data-act="sync">Ver ligação</button></div>`;
+  else if(MODE==="cloud"){const lf=localFichas();if(lf.length)h=`<div class="confirm" style="border-color:var(--warn)"><span style="flex:1"><b>${lf.length} ficha(s) estão só neste equipamento</b> (criadas antes de ligar à equipa). Os outros equipamentos não as veem até serem enviadas.</span><button class="btn primary" type="button" data-act="up">Enviar para a equipa</button></div>`}
+  else if(DB.fichas.some(f=>!f.exemplo))h=`<div class="confirm" style="border-color:var(--line)"><span style="flex:1">Este equipamento não está ligado a uma equipa. As fichas ficam só aqui.</span><button class="btn" type="button" data-act="sync">Ligar à equipa</button></div>`;
+  B.innerHTML=h;B.hidden=!h;
+  B.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>b.dataset.act==="up"?uploadLocal():$("btnSync").click());
+}
+async function uploadLocal(){const lf=localFichas();if(!lf.length)return;try{await writeAll(lf);
+  try{const d=JSON.parse(localStorage.getItem(KEY));d.fichas=d.fichas.filter(f=>f.exemplo);localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}
+  $("wrapUp").hidden=true;syncBanner();toast(lf.length+" ficha(s) enviadas para a equipa")}catch(e){toast("Erro ao enviar: "+(e.code||e.message))}}
 function renderList(){
+  syncBanner();
   const L=$("listFichas");
   if(!DB.fichas.length){L.innerHTML=`<div class="empty" style="grid-column:1/-1">Ainda não há fichas. Toque em <b>+ Nova ficha</b> para começar o registo de uma saída.</div>`;return}
   const fs=[...DB.fichas].sort((a,b)=>(b.ano-a.ano)||(b.mes-a.mes)||(b.criada-a.criada));
@@ -798,7 +812,8 @@ function init(){
     setSyncCfg({cfg:FIREBASE_CONFIG?null:cfg,equipa:eq}); closeS(); showList(); toast("Ligado à equipa "+eq);
   };
   $("sOff").onclick=()=>{disconnect();closeS();toast("Desligado — a gravar só neste dispositivo")};
-  $("sUp").onclick=async()=>{const lf=localFichas();try{await writeAll(lf);
+  $("sUp").onclick=uploadLocal;
+  const _oldUp=async()=>{const lf=localFichas();try{await writeAll(lf);
     try{const d=JSON.parse(localStorage.getItem(KEY));d.fichas=d.fichas.filter(f=>f.exemplo);localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}
     $("wrapUp").hidden=true;toast(lf.length+" ficha(s) enviadas para a equipa")}catch(e){$("sErr").textContent="Erro ao enviar: "+(e.code||e.message);$("sErr").hidden=false}};
 
