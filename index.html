@@ -1,3 +1,11 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5468">
+</head>
+<body>
 <title>SOS Cagarro · Salvamentos</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,6 +29,7 @@
   --accent:#f0c63c; --accent-ink:#1d1704; --sea:#7fb6cb; --sea-soft:#1b323b;
   --ok:#6cc18f; --warn:#e2a24a; --bad:#e57878; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;margin:0}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--sea)}
 .wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
@@ -814,3 +823,6 @@ function init(){
 }
 init();
 </script>
+
+</body>
+</html>
