@@ -1,5 +1,5 @@
 // SOS Cagarro — service worker (funcionamento sem rede)
-const CACHE = "sos-cagarro-v6";
+const CACHE = "sos-cagarro-v7";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-512-maskable.png", "./apple-touch-icon.png"];
 const CDN = ["cdnjs.cloudflare.com", "www.gstatic.com", "fonts.googleapis.com", "fonts.gstatic.com"];
 

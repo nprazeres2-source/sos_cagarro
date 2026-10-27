@@ -489,6 +489,7 @@ const FIREBASE_CONFIG = {
   appId: "1:997079796847:web:d669648443e1b13bbdd19a"
 }; // projeto Firebase "equip-campo" (partilhado com a app do Equipamento de Campo)
 const KEY_SYNC="sosCagarro.sync";
+const EQUIPA_FIXA="DRPM_SOS%2026"; // todos os equipamentos ligam-se automaticamente a esta equipa
 const COL="sos_cagarro";
 
 /* ---- camada de dados: local ou equipa (Firestore) ---- */
@@ -566,7 +567,7 @@ function connect(cfg,equipa){
     return "";
   }catch(e){MODE="local";setStatus("off","Configuração inválida");return "Não foi possível ligar: "+e.message}
 }
-function disconnect(){unsubs.forEach(u=>u());unsubs=[];MODE="local";base=null;setSyncCfg(null);load();setStatus("","Só neste dispositivo");showList()}
+function disconnect(){unsubs.forEach(u=>u());unsubs=[];MODE="local";base=null;setSyncCfg({off:true});load();setStatus("","Só neste dispositivo");showList()}
 function putFicha(f){if(MODE==="local")return save();base.collection("fichas").doc(f.id).set(headerOnly(f)).catch(e=>toast("Erro ao gravar: "+e.code))}
 function putReg(f,r){if(MODE==="local")return save();base.collection("registos").doc(r.id).set({...r,fid:f.id}).catch(e=>toast("Erro ao gravar: "+e.code))}
 function delReg(rid){if(MODE==="local")return save();base.collection("registos").doc(rid).delete()}
@@ -1170,7 +1171,7 @@ function init(){
   document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("ov").hidden)closeEditor();else if(!$("ovB").hidden)closeB()}});
   /* sincronização */
   const openS=()=>{const c=syncCfg();$("sErr").hidden=true;$("wrapCfg").hidden=!!FIREBASE_CONFIG;
-    if(c.cfg&&!$("s_cfg").value)$("s_cfg").value=JSON.stringify(c.cfg,null,1);$("s_eq").value=c.equipa||"";
+    if(c.cfg&&!$("s_cfg").value)$("s_cfg").value=JSON.stringify(c.cfg,null,1);$("s_eq").value=c.equipa||EQUIPA_FIXA;
     $("sOn").textContent=MODE==="cloud"?"Mudar de equipa":"Ligar";$("sOff").hidden=MODE!=="cloud";
     const lf=localFichas();$("wrapUp").hidden=!(MODE==="cloud"&&lf.length);
     $("upInfo").textContent=`${lf.length} ficha(s) e ${lf.reduce((n,f)=>n+(f.reg||[]).length,0)} registo(s) foram criados antes da ligação. Pode enviá-los para a equipa.`;
@@ -1232,8 +1233,8 @@ function init(){
   loadPerfil();showPerfil();
 
   load();
-  const sc=syncCfg(), cfg=FIREBASE_CONFIG||sc.cfg;
-  if(cfg&&sc.equipa){const m=connect(cfg,sc.equipa);if(m)toast(m)}
+  const sc=syncCfg(), cfg=FIREBASE_CONFIG||sc.cfg, eqAuto=sc.equipa||(FIREBASE_CONFIG&&!sc.off?EQUIPA_FIXA:"");
+  if(cfg&&eqAuto){const m=connect(cfg,eqAuto);if(m)toast(m);else if(!sc.equipa)setSyncCfg({cfg:null,equipa:eqAuto})}
   showList();
   if(!PERFIL.key){PERFIL={};savePerfil();showPerfil();openPerfil(true)}
   else if(MODE==="cloud")validatePerfil();
