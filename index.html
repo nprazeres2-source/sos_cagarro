@@ -97,6 +97,7 @@ tbody tr:last-child td{border-bottom:0}
 .seg input:checked + label{background:var(--sea);border-color:var(--sea);color:var(--surface)}
 .seg input:focus-visible + label{outline:3px solid var(--accent);outline-offset:2px}
 .hint{font-size:12px;color:var(--muted)}
+label.f > span.hint{text-transform:none;letter-spacing:0;font-weight:400}
 .err{color:var(--bad);font-weight:600;font-size:14px}
 .confirm{background:var(--surface);border:1px solid var(--bad);border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:40}
@@ -323,7 +324,7 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
       <label class="f" id="wrapCfg"><span>Configuração Firebase</span><textarea id="s_cfg" class="csvbox" style="min-height:120px" spellcheck="false" placeholder='Cole aqui o bloco firebaseConfig da consola Firebase:
 { apiKey: "...", authDomain: "...", projectId: "...", ... }'></textarea>
         <span class="hint">Só é preciso colar uma vez por equipamento. Se a configuração estiver escrita no ficheiro publicado, este campo não aparece.</span></label>
-      <label class="f"><span>Código da equipa</span><input id="s_eq" class="code" autocomplete="off" placeholder="mín. 6 caracteres, ex.: FAIAL-VN-2026"></label>
+      <label class="f"><span>Código da equipa</span><input id="s_eq" class="code" autocomplete="off" placeholder="mín. 6 caracteres, ex.: DRPM_SOS%2026"><span class="hint">Maiúsculas/minúsculas e espaços não contam: drpm_sos%2026 e DRPM_SOS%2026 são a mesma equipa.</span></label>
       <div class="err" id="sErr" hidden></div>
       <div class="row">
         <button class="btn primary" type="button" id="sOn">Ligar</button>
@@ -406,6 +407,30 @@ function rebuild(){
   }else if(!$("vList").hidden)renderList();
   else if(!$("vRel").hidden)renderRel();
 }
+const normEq=c=>String(c||"").replace(/\s+/g,"").toUpperCase();
+function teamId(c){ // identificador estável: ignora maiúsculas/minúsculas e espaços; aceita qualquer carácter (% _ etc.)
+  const n="sos-cagarro|"+normEq(c);let h1=0x811c9dc5,h2=0x01000193^n.length;
+  for(let i=0;i<n.length;i++){const k=n.charCodeAt(i);h1=Math.imul(h1^k,16777619)>>>0;h2=Math.imul(h2^k,2246822519)>>>0;h2=(h2<<13|h2>>>19)>>>0}
+  return "eq_"+h1.toString(16).padStart(8,"0")+h2.toString(16).padStart(8,"0");
+}
+async function migrateLegacy(db,raw){
+  const key="sosCagarro.migr."+teamId(raw);try{if(localStorage.getItem(key))return}catch(e){}
+  const cands=[...new Set([raw,raw.trim()])].filter(x=>x&&!x.includes("/"));
+  let n=0;
+  for(const c of cands){
+    try{
+      const old=db.collection(COL).doc(c);
+      const [fs,rs]=await Promise.all([old.collection("fichas").get(),old.collection("registos").get()]);
+      if(!fs.size&&!rs.size)continue;
+      let b=db.batch(),k=0;
+      const add=async(col,d)=>{b.set(base.collection(col).doc(d.id),d.data());if(++k>=400){await b.commit();b=db.batch();k=0}};
+      for(const d of fs.docs)await add("fichas",d);for(const d of rs.docs)await add("registos",d);
+      if(k)await b.commit();n+=fs.size;
+    }catch(e){return}
+  }
+  try{localStorage.setItem(key,"1")}catch(e){}
+  if(n)toast(n+" ficha(s) recuperadas da ligação anterior");
+}
 function connect(cfg,equipa){
   if(typeof firebase==="undefined"){setStatus("off","Sincronização indisponível aqui");return "A sincronização só funciona na versão publicada (GitHub Pages). Aqui a app grava apenas neste dispositivo."}
   try{
@@ -413,7 +438,8 @@ function connect(cfg,equipa){
     const db=app.firestore();
     if(!connect._p){connect._p=true;db.enablePersistence({synchronizeTabs:true}).catch(()=>{})}
     unsubs.forEach(u=>u());unsubs=[];cloudF={};cloudR={};gotF=gotR=false;
-    base=db.collection(COL).doc(equipa); MODE="cloud"; DB={fichas:[]}; cur=null;
+    const raw=equipa; equipa=normEq(equipa);
+    base=db.collection(COL).doc(teamId(equipa)); MODE="cloud"; DB={fichas:[]}; cur=null;
     setStatus("wait","A ligar à equipa "+equipa+"…");
     const onErr=e=>{setStatus("off",e.code==="permission-denied"?"Sem permissão: faltam as regras SOS Cagarro no Firebase":"Erro de ligação: "+(e.code||e.message));if(!$("vList").hidden)renderList()};
     const meta=s=>{ if(s.metadata.hasPendingWrites)setStatus("wait","A enviar alterações…");
@@ -421,6 +447,7 @@ function connect(cfg,equipa){
       else setStatus("on","Sincronizado · "+equipa)};
     unsubs.push(base.collection("fichas").onSnapshot({includeMetadataChanges:true},s=>{cloudF={};s.forEach(d=>cloudF[d.id]={...d.data(),id:d.id});gotF=true;meta(s);rebuild()},onErr));
     unsubs.push(base.collection("registos").onSnapshot({includeMetadataChanges:true},s=>{cloudR={};s.forEach(d=>cloudR[d.id]={...d.data(),id:d.id});gotR=true;meta(s);rebuild()},onErr));
+    migrateLegacy(db,raw);
     return "";
   }catch(e){MODE="local";setStatus("off","Configuração inválida");return "Não foi possível ligar: "+e.message}
 }
@@ -807,7 +834,7 @@ function init(){
     const cfg=FIREBASE_CONFIG||parseCfg($("s_cfg").value); const eq=$("s_eq").value.trim();
     const err=m=>{$("sErr").textContent=m;$("sErr").hidden=false};
     if(!cfg)return err("Cole a configuração Firebase (precisa pelo menos de apiKey e projectId).");
-    if(eq.length<6||/[\/.#$\[\]]/.test(eq))return err("O código da equipa precisa de 6 ou mais caracteres, sem / . # $ [ ].");
+    if(normEq(eq).length<6)return err("O código da equipa precisa de 6 ou mais caracteres.");
     const m=connect(cfg,eq); if(m)return err(m);
     setSyncCfg({cfg:FIREBASE_CONFIG?null:cfg,equipa:eq}); closeS(); showList(); toast("Ligado à equipa "+eq);
   };
