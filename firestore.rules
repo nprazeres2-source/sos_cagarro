@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /registosEquipamentoCampo/{doc} {
+      allow read, write: if true;
+    }
+    match /contadores/{doc} {
+      allow read, write: if true;
+    }
+    match /diario_viatura/{doc} {
+      allow read, write: if true;
+    }
+    // SOS Cagarro: fichas, registos e configuração (PIN da DRPM)
+    match /sos_cagarro/{equipa}/{colecao}/{doc} {
+      allow read, write: if colecao in ['fichas', 'registos', 'config'];
+    }
+  }
+}
