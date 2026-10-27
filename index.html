@@ -139,6 +139,7 @@ label.f > span.warnbox{text-transform:none;letter-spacing:0;font-weight:500;font
 .recap b{color:var(--sea)}
 .recap .it{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer}
 .recap .it:hover{border-color:var(--sea)}
+.codesrow{display:flex;gap:6px}.codesrow input{min-width:0;min-height:38px;padding:6px 8px;font-size:14px}
 .ilhas{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
 .ilhas button{font:600 15px var(--f-body);border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:12px;cursor:pointer;min-height:48px;text-align:left}
 .ilhas button[aria-pressed="true"]{background:var(--sea);border-color:var(--sea);color:var(--surface)}
@@ -263,7 +264,6 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
       <button class="btn ghost" id="btnVoltar" type="button">← Fichas</button>
       <span class="spacer"></span>
       <button class="btn" id="btnPDF" type="button">PDF Ficha B</button>
-      <button class="btn" id="btnMail" type="button">Enviar por email</button>
       <button class="btn" id="btnFechar" type="button">Fechar ficha</button>
       <button class="btn" id="btnFichaX" type="button">Exportar Excel</button>
       <button class="btn" id="btnCSV" type="button">CSV</button>
@@ -420,23 +420,21 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
 <!-- PERFIL DO EQUIPAMENTO -->
 <div class="overlay" id="ovP" hidden>
   <div class="sheet">
-    <div class="bar"><h2 style="flex:1">Perfil deste equipamento</h2><button class="btn ghost" type="button" id="pClose">Fechar</button></div>
-    <div class="fs">
-      <h3>Que fichas vê este equipamento?</h3>
-      <p class="sub" style="margin:0">Cada ilha vê e cria apenas as fichas da sua ilha. A DRPM vê todas as ilhas e é a única que pode reabrir fichas fechadas.</p>
-      <div class="ilhas" id="pIlhas"></div>
-      <div id="pPinWrap" hidden class="grid" style="gap:10px">
-        <label class="f"><span id="pPinLbl">PIN da DRPM</span><input id="p_pin" type="password" inputmode="numeric" autocomplete="off"></label>
-        <label class="f" id="pPin2Wrap" hidden><span>Repetir PIN</span><input id="p_pin2" type="password" inputmode="numeric" autocomplete="off"></label>
-        <span class="hint" id="pPinHint"></span>
-      </div>
+    <div class="bar"><h2 style="flex:1">Acesso deste equipamento</h2><button class="btn ghost" type="button" id="pClose">Fechar</button></div>
+    <div class="statebox"><span id="pAtual">Sem perfil</span></div>
+    <form class="fs" id="pForm" novalidate>
+      <h3>Código de acesso</h3>
+      <p class="sub" style="margin:0">Cada ilha tem o seu código, e a DRPM tem outro. A app reconhece o código e mostra só as fichas dessa ilha; o código da DRPM mostra todas as ilhas.</p>
+      <label class="f"><span>Código</span><input id="p_code" class="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ex.: FAI-XXXXX"></label>
       <div class="err" id="pErr" hidden></div>
+      <div class="row"><span class="spacer"></span><button class="btn primary" type="submit" id="pSave">Entrar</button></div>
+    </form>
+    <div class="fs" id="pAdmin" hidden>
+      <h3>Gerir códigos de acesso (DRPM)</h3>
+      <p class="sub" style="margin:0">Ao alterar um código, os equipamentos dessa ilha voltam a pedir o código na próxima abertura com rede.</p>
+      <div class="tbl-wrap"><table id="pCodes"></table></div>
+      <div class="err" id="pAdmErr" hidden></div>
     </div>
-    <div class="fs">
-      <h3>Envio das fichas</h3>
-      <label class="f"><span>Email para onde enviar as fichas</span><input id="p_mail" type="email" inputmode="email" autocomplete="off" placeholder="ex.: cagarro@azores.gov.pt"><span class="hint">Usado no botão "Enviar por email" de cada ficha.</span></label>
-    </div>
-    <div class="row"><span class="spacer"></span><button class="btn primary" type="button" id="pSave">Guardar perfil</button></div>
   </div>
 </div>
 <!-- IMPORTAR EXCEL -->
@@ -990,55 +988,70 @@ function showImpPreview(p,sheet){
     const n=impPlan.novos+impPlan.atual;impPlan=null;$("ovI").hidden=true;document.body.style.overflow="";showList();toast(n+" registo(s) importados")};
 }
 
-/* ---- perfil do equipamento (ilha / DRPM) ---- */
+/* ---- perfil do equipamento: código de acesso por ilha / DRPM ---- */
 const KEY_PERF="sosCagarro.perfil";
-let PERFIL={};
+// códigos iniciais (guardados só como impressão digital; a DRPM pode alterá-los na app)
+const CODIGOS_PADRAO={"Santa Maria": "eq_9febefaaed1b6b0c", "São Miguel": "eq_c02a6b0ee59f8752", "Terceira": "eq_b7f7e3eef0adf3a6", "Graciosa": "eq_8bb46d7dd7058dfd", "São Jorge": "eq_8ac9a215d806f548", "Pico": "eq_28e800d84b6c6a7f", "Faial": "eq_e4116a357cffc462", "Flores": "eq_bcd90c0645e02cf6", "Corvo": "eq_49b37db5c1fb9df5", "drpm": "eq_5ae90dfe67256e59"};
+const ACESSO_KEYS=[...ILHAS,"drpm"];
+let PERFIL={},CODIGOS={...CODIGOS_PADRAO},codigosInfo={};
 function loadPerfil(){try{PERFIL=JSON.parse(localStorage.getItem(KEY_PERF)||"null")||{}}catch(e){PERFIL={}}}
 function savePerfil(){try{localStorage.setItem(KEY_PERF,JSON.stringify(PERFIL))}catch(e){}}
 const isDRPM=()=>PERFIL.tipo==="drpm";
 function VIS(){return PERFIL.tipo==="ilha"&&PERFIL.ilha?DB.fichas.filter(f=>f.ilha===PERFIL.ilha):DB.fichas}
 function ILHAS_VIS(){return PERFIL.tipo==="ilha"&&PERFIL.ilha?[PERFIL.ilha]:ILHAS}
-function perfilLabel(){return isDRPM()?"DRPM · todas as ilhas":PERFIL.ilha?PERFIL.ilha:"Escolher perfil"}
+function perfilLabel(){return isDRPM()?"DRPM · todas as ilhas":PERFIL.ilha?PERFIL.ilha:"Sem acesso"}
 function showPerfil(){$("perfilTxt").textContent=perfilLabel()}
-const hashStr=t=>teamId("pin|"+t);
-async function getPinHash(){
-  if(MODE==="cloud"){try{const d=await base.collection("config").doc("drpm").get();return d.exists?d.data().pinHash||"":""}catch(e){throw new Error(e.code==="permission-denied"?"Sem permissão para ler a configuração. Atualize as regras do Firebase (ver instruções).":"Sem ligação: não foi possível confirmar o PIN.")}}
-  try{return localStorage.getItem("sosCagarro.pinLocal")||""}catch(e){return ""}
+const codeHash=c=>teamId("acesso|"+normEq(c));
+async function loadCodigos(){
+  let over={};
+  if(MODE==="cloud"){try{const d=await base.collection("config").doc("codigos").get();over=d.exists?d.data():{}}catch(e){throw new Error(e.code==="permission-denied"?"Sem permissão para ler os códigos. Confirme as regras do Firebase ('config').":"Sem ligação à equipa: não foi possível confirmar o código.")}}
+  else{try{over=JSON.parse(localStorage.getItem("sosCagarro.codigos")||"{}")}catch(e){}}
+  CODIGOS={...CODIGOS_PADRAO};codigosInfo={};
+  ACESSO_KEYS.forEach(k=>{const v=over[k];if(v&&v.h){CODIGOS[k]=v.h;codigosInfo[k]=v.em||""}});
+  return CODIGOS;
 }
-async function setPinHash(h){
-  if(MODE==="cloud")return base.collection("config").doc("drpm").set({pinHash:h,definidoEm:new Date().toISOString()});
-  try{localStorage.setItem("sosCagarro.pinLocal",h)}catch(e){}
+async function saveCodigo(key,code){
+  const v={h:codeHash(code),em:new Date().toISOString()};
+  if(Object.entries(CODIGOS).some(([k,h])=>k!==key&&h===v.h))throw new Error("Esse código já está a ser usado por outro perfil.");
+  if(MODE==="cloud")await base.collection("config").doc("codigos").set({[key]:v},{merge:true});
+  else{let o={};try{o=JSON.parse(localStorage.getItem("sosCagarro.codigos")||"{}")}catch(e){}o[key]=v;try{localStorage.setItem("sosCagarro.codigos",JSON.stringify(o))}catch(e){}}
+  CODIGOS[key]=v.h;codigosInfo[key]=v.em;
+  if(PERFIL.key===key){PERFIL.h=v.h;savePerfil()}
 }
-let pSel=null,pinExists=null;
-async function openPerfil(force){
-  pSel=PERFIL.tipo==="drpm"?"drpm":(PERFIL.ilha||null);$("pErr").hidden=true;$("p_pin").value="";$("p_pin2").value="";$("p_mail").value=PERFIL.email||"";
-  $("pClose").hidden=!!force;
-  $("pIlhas").innerHTML=ILHAS.map(i=>`<button type="button" data-v="${i}">${i}</button>`).join("")+`<button type="button" class="drpm" data-v="drpm">DRPM — todas as ilhas</button>`;
-  const upd=async()=>{
-    $("pIlhas").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===pSel)));
-    const need=pSel==="drpm"&&!isDRPM();$("pPinWrap").hidden=!need;
-    if(need){$("pPinHint").textContent="A verificar…";try{pinExists=!!(await getPinHash())}catch(e){pinExists=null;$("pPinHint").textContent=e.message;return}
-      $("pPin2Wrap").hidden=pinExists;$("pPinLbl").textContent=pinExists?"PIN da DRPM":"Definir PIN da DRPM (novo)";
-      $("pPinHint").textContent=pinExists?"Introduza o PIN da DRPM para ver todas as ilhas.":"Ainda não existe PIN. O PIN que definir agora será pedido a todos os equipamentos que escolherem DRPM.";}
-  };
-  $("pIlhas").querySelectorAll("button").forEach(b=>b.onclick=()=>{pSel=b.dataset.v;upd()});
-  upd();$("ovP").hidden=false;document.body.style.overflow="hidden";
+async function validatePerfil(){
+  if(!PERFIL.key)return;
+  try{await loadCodigos()}catch(e){return}
+  if(CODIGOS[PERFIL.key]!==PERFIL.h){const was=perfilLabel();PERFIL={};savePerfil();showPerfil();showList();openPerfil(true,`O código de acesso de ${was} foi alterado. Introduza o código novo.`)}
+}
+function openPerfil(force,msg){
+  $("pErr").hidden=!msg;if(msg)$("pErr").textContent=msg;$("p_code").value="";$("pClose").hidden=!!force;
+  $("pAtual").textContent=PERFIL.key?"Acesso atual: "+perfilLabel():"Este equipamento ainda não tem acesso. Introduza o código da sua ilha.";
+  $("pAdmin").hidden=!isDRPM();if(isDRPM())renderCodigos();
+  $("ovP").hidden=false;document.body.style.overflow="hidden";setTimeout(()=>$("p_code").focus(),50);
 }
 function closePerfil(){$("ovP").hidden=true;document.body.style.overflow=""}
-async function savePerfilUI(){
+async function entrarCodigo(){
   const err=m=>{$("pErr").textContent=m;$("pErr").hidden=false};
-  if(!pSel)return err("Escolha a ilha deste equipamento ou DRPM.");
-  if(pSel==="drpm"&&!isDRPM()){
-    const pin=$("p_pin").value.trim();if(pin.length<4)return err("O PIN precisa de pelo menos 4 caracteres.");
-    let h;try{h=await getPinHash()}catch(e){return err(e.message)}
-    if(h){if(h!==hashStr(pin))return err("PIN incorreto.")}
-    else{if(pin!==$("p_pin2").value.trim())return err("Os dois PIN não coincidem.");try{await setPinHash(hashStr(pin))}catch(e){return err("Não foi possível gravar o PIN: "+(e.code||e.message)+". Confirme as regras do Firebase.")}}
-    PERFIL={tipo:"drpm"};
-  }else if(pSel!=="drpm")PERFIL={tipo:"ilha",ilha:pSel};
-  PERFIL.email=$("p_mail").value.trim();
-  savePerfil();showPerfil();closePerfil();showList();toast("Perfil: "+perfilLabel());
+  const code=$("p_code").value;if(normEq(code).length<4)return err("Escreva o código de acesso.");
+  $("pSave").disabled=true;
+  try{await loadCodigos()}catch(e){$("pSave").disabled=false;return err(e.message)}
+  $("pSave").disabled=false;
+  const h=codeHash(code),key=ACESSO_KEYS.find(k=>CODIGOS[k]===h);
+  if(!key)return err("Código inválido. Confirme o código com a DRPM.");
+  PERFIL=key==="drpm"?{tipo:"drpm",key,h}:{tipo:"ilha",ilha:key,key,h};
+  savePerfil();showPerfil();
+  if(isDRPM()){$("pAtual").textContent="Acesso atual: "+perfilLabel();$("pAdmin").hidden=false;renderCodigos();$("pClose").hidden=false;$("p_code").value="";$("pErr").hidden=true;toast("Acesso DRPM");showList();return}
+  closePerfil();showList();toast("Acesso: "+perfilLabel());
 }
-
+function renderCodigos(){
+  $("pCodes").innerHTML=`<thead><tr><th>Perfil</th><th>Estado</th><th>Novo código</th></tr></thead><tbody>`+ACESSO_KEYS.map(k=>`<tr style="cursor:default"><td><b>${k==="drpm"?"DRPM":k}</b></td>
+    <td class="sub">${codigosInfo[k]?"Alterado em "+new Date(codigosInfo[k]).toLocaleDateString("pt-PT"):"Código inicial"}</td>
+    <td><div class="codesrow"><input class="code" data-k="${esc(k)}" autocomplete="off" placeholder="novo código"><button class="btn" type="button" data-k="${esc(k)}">Alterar</button></div></td></tr>`).join("")+"</tbody>";
+  $("pCodes").querySelectorAll("button[data-k]").forEach(b=>b.onclick=async()=>{
+    const k=b.dataset.k,inp=$("pCodes").querySelector(`input[data-k="${CSS.escape(k)}"]`),v=inp.value.trim(),e=$("pAdmErr");e.hidden=true;
+    if(normEq(v).length<6){e.textContent="O código precisa de pelo menos 6 caracteres.";e.hidden=false;return}
+    try{await saveCodigo(k,v);inp.value="";renderCodigos();toast(`Código de ${k==="drpm"?"DRPM":k} alterado`)}catch(x){e.textContent=x.message||String(x);e.hidden=false}});
+}
 /* ---- fechar / reabrir ficha ---- */
 function applyLock(){
   const lk=!!cur.fechada;
@@ -1122,26 +1135,7 @@ function fichaPDF(f){
   return doc;
 }
 const pdfName=f=>"Ficha_B_"+fichaCode(f).replace(/\//g,"_")+".pdf";
-function downloadBlob(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 function pdfFicha(){if(!cur||!needPDF())return;try{fichaPDF(cur).save(pdfName(cur));toast("PDF criado")}catch(e){toast("Não foi possível criar o PDF: "+e.message)}}
-function fichaWB(f){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,registosSheet((f.reg||[]).map(r=>({f,r}))),"Registos");return wb}
-async function mailFicha(){
-  if(!cur||!needPDF())return;const f=cur;
-  const pdf=new File([fichaPDF(f).output("blob")],pdfName(f),{type:"application/pdf"});
-  const files=[pdf];
-  if(typeof XLSX!=="undefined"){try{const buf=XLSX.write(fichaWB(f),{bookType:"xlsx",type:"array"});files.push(new File([buf],pdfName(f).replace(".pdf",".xlsx"),{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}))}catch(e){}}
-  const c=counts(f);
-  const subject=`SOS Cagarro – Ficha ${fichaCode(f)}`;
-  const body=`Segue em anexo a Ficha B de registo de salvamentos ${fichaCode(f)}.\n\nIlha: ${f.ilha||""}\nResponsável: ${f.resp||""}${f.tel?" ("+f.tel+")":""}\nCagarros: ${f.reg.length} (vivos ${c.Vivo}, feridos ${c.Ferido}, mortos ${c.Morto})${f.fobs?"\nObservações: "+f.fobs:""}\n`;
-  try{if(navigator.canShare&&navigator.canShare({files})){await navigator.share({files,title:subject,text:body});return}}catch(e){if(e&&e.name==="AbortError")return}
-  // alternativa: descarregar anexos e abrir o email
-  files.forEach(fl=>downloadBlob(fl,fl.name));
-  const to=PERFIL.email||"";
-  $("confFicha").innerHTML=`<div class="confirm section"><span style="flex:1">Foram descarregados <b>${files.map(x=>esc(x.name)).join("</b> e <b>")}</b>. Anexe-os ao email que vai abrir${to?" para <b>"+esc(to)+"</b>":""}.</span><button class="btn" type="button" id="mNo">Fechar</button></div>`;
-  $("mNo").onclick=()=>$("confFicha").innerHTML="";
-  setTimeout(()=>{location.href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body+"\n(Anexar: "+files.map(x=>x.name).join(", ")+")")}`},600);
-}
-
 /* ---- arranque ---- */
 function init(){
   $("h_ilha").innerHTML=`<option value="">—</option>`+ILHAS.map(i=>`<option>${i}</option>`).join("");
@@ -1229,19 +1223,20 @@ function init(){
     else{$("ovInst").hidden=false;document.body.style.overflow="hidden"}};
   $("instClose").onclick=()=>{$("ovInst").hidden=true;document.body.style.overflow=""};
 
-  $("btnPDF").onclick=pdfFicha;$("btnMail").onclick=mailFicha;$("btnFechar").onclick=toggleFecho;
+  $("btnPDF").onclick=pdfFicha;$("btnFechar").onclick=toggleFecho;
   $("c_nova").addEventListener("input",checkNova);$("c_anilha").addEventListener("input",checkRecap);
   document.querySelectorAll('input[name="anil"]').forEach(e=>e.addEventListener("change",()=>{
     if(!editId&&getSeg("anil")==="Sim"&&$("c_nova").value===nextRing()){$("c_nova").value="";$("hintNova").textContent="Cagarro já anilhado: deixe vazio, salvo se colocar anilha nova.";checkNova()}
     checkRecap()}));
-  $("btnPerfil").onclick=()=>openPerfil(false);$("pClose").onclick=closePerfil;$("pSave").onclick=savePerfilUI;
+  $("btnPerfil").onclick=()=>openPerfil(false);$("pClose").onclick=closePerfil;$("pForm").onsubmit=e=>{e.preventDefault();entrarCodigo()};
   loadPerfil();showPerfil();
 
   load();
   const sc=syncCfg(), cfg=FIREBASE_CONFIG||sc.cfg;
   if(cfg&&sc.equipa){const m=connect(cfg,sc.equipa);if(m)toast(m)}
   showList();
-  if(!PERFIL.tipo)openPerfil(true);
+  if(!PERFIL.key){PERFIL={};savePerfil();showPerfil();openPerfil(true)}
+  else if(MODE==="cloud")validatePerfil();
 }
 init();
 </script>
