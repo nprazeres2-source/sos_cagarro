@@ -194,10 +194,9 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
     </div>
     <div class="section panel grid" style="gap:14px">
       <div class="grid g-head">
-        <label class="f" style="grid-column:span 2"><span>Pesquisar</span><input id="q_txt" type="search" placeholder="código, anilha, local, GPS, observações…" autocomplete="off"></label>
+        <label class="f" style="grid-column:span 2"><span>Pesquisar</span><input id="q_txt" type="search" placeholder="código, anilha, local, observações…" autocomplete="off"></label>
         <label class="f"><span>Ilha</span><select id="q_ilha" class="qf"></select></label>
         <label class="f"><span>Estado</span><select id="q_est" class="qf"></select></label>
-        <label class="f"><span>Origem</span><select id="q_orig" class="qf"></select></label>
       </div>
       <details id="qMore">
         <summary>Mais critérios <span class="sub" id="qMoreN"></span></summary>
@@ -209,6 +208,7 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
           <label class="f"><span>Nova anilha</span><select id="q_nova" class="qf"></select></label>
           <label class="f"><span>Penugem</span><select id="q_pen" class="qf"></select></label>
           <label class="f"><span>Sexo</span><select id="q_sexo" class="qf"></select></label>
+          <label class="f"><span>Idade</span><select id="q_idade" class="qf"></select></label>
           <label class="f"><span>Libertação</span><select id="q_lib" class="qf"></select></label>
           <label class="f"><span>Salvamento de</span><input id="q_de" type="date" class="qf"></label>
           <label class="f"><span>Salvamento até</span><input id="q_ate" type="date" class="qf"></label>
@@ -226,11 +226,13 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
   <section id="vList">
     <div class="section row">
       <div style="flex:1;min-width:220px"><h1>Fichas de salvamento</h1><p class="sub" style="margin:4px 0 0">Uma ficha por saída de recolha (ilha, anilhador, mês e ano).</p></div>
+      <button class="btn" id="btnDup" type="button" hidden>Remover duplicados</button>
       <button class="btn" id="btnImpX" type="button">Importar Excel</button>
       <button class="btn" id="btnExpX" type="button">Exportar Excel</button>
       <button class="btn primary" id="btnNovaFicha" type="button">+ Nova ficha</button>
     </div>
     <div class="section" id="syncBanner" hidden></div>
+    <div class="section" id="dupBox"></div>
     <div class="section fichas" id="listFichas"></div>
   </section>
 
@@ -294,9 +296,9 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
     </div>
     <div class="section tbl-wrap"><table>
       <thead><tr>
-        <th>Código</th><th>Origem</th><th>GPS / local</th><th>Data salv.</th><th>Estado</th><th>Já anilhado</th>
+        <th>Código</th><th>Data salv.</th><th>Estado</th><th>Já anilhado</th>
         <th>Nova anilha</th><th>Data anilh.</th><th>Anilhador</th><th class="num">Pen.</th><th class="num">Asa mm</th><th class="num">Peso g</th>
-        <th class="num">Tarso mm</th><th class="num">Culmen mm</th><th class="num">Bico mm</th><th>Sexo</th><th>Libertação</th><th>Obs.</th>
+        <th class="num">Tarso mm</th><th class="num">Culmen mm</th><th class="num">Bico mm</th><th>Sexo</th><th>Idade</th><th>Libertação</th><th>Obs.</th>
       </tr></thead>
       <tbody id="tb"></tbody>
     </table></div>
@@ -315,9 +317,6 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
         <label class="f"><span>Código do cagarro *</span><input id="c_cod" class="code" inputmode="numeric" autocomplete="off"></label>
         <label class="f"><span>Data de salvamento</span><input id="c_dsal" type="date"></label>
       </div>
-      <div><span class="hint" style="display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.07em">Origem do salvamento</span>
-        <div class="seg" id="seg_orig"></div></div>
-      <label class="f"><span>Coordenadas GPS ou local exato de salvamento</span><input id="c_gps" placeholder="ex.: 38.5362, -28.6268 ou Rua X, junto ao porto"></label>
       <div><span class="hint" style="display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.07em">Estado</span>
         <div class="seg" id="seg_est"></div></div>
     </div>
@@ -352,6 +351,8 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
       </div>
       <div><span class="hint" style="display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.07em">Sexo</span>
         <div class="seg" id="seg_sexo"></div></div>
+      <div><span class="hint" style="display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.07em">Idade</span>
+        <div class="seg" id="seg_idade"></div></div>
     </div>
 
     <div class="fs"><h3>Libertação</h3>
@@ -473,6 +474,7 @@ const ILHAS=["Santa Maria","São Miguel","Terceira","Graciosa","São Jorge","Pic
 const MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const ORIG=["Chamada de Particular","Entrega em PE","Salvamento VN","Salvamento DRPM"];
 const EST=["Vivo","Ferido","Morto"];
+const IDADES=["Juvenil","Adulto","Indeterminada"];
 const KEY="sosCagarro.v1";
 
 /* ===== CONFIGURAÇÃO FIREBASE =====
@@ -508,8 +510,12 @@ function setStatus(kind,txt){
   $("syncTxt").textContent=txt; $("sState").textContent=txt;
   if(prev!==kind&&$("syncBanner")&&!$("vList").hidden)syncBanner();
 }
+let readyRes=null,readyP=null;
+function resetReady(){readyP=new Promise(r=>readyRes=r)}
+resetReady();
 function rebuild(){
   if(!(gotF&&gotR))return;
+  if(readyRes){readyRes();readyRes=null}
   const regs=Object.values(cloudR);
   DB={fichas:Object.values(cloudF).map(f=>({...f,reg:regs.filter(r=>r.fid===f.id).sort((a,b)=>(a.ord||0)-(b.ord||0))}))};
   if(cur){
@@ -531,21 +537,22 @@ function teamId(c){ // identificador estável: ignora maiúsculas/minúsculas e 
 }
 async function migrateLegacy(db,raw){
   const key="sosCagarro.migr."+teamId(raw);try{if(localStorage.getItem(key))return}catch(e){}
-  const cands=[...new Set([raw,raw.trim()])].filter(x=>x&&!x.includes("/"));
-  let n=0;
-  for(const c of cands){
-    try{
+  try{
+    await readyP;
+    const mk=base.collection("config").doc("migracao");
+    if((await mk.get()).exists){try{localStorage.setItem(key,"1")}catch(e){}return}
+    const cands=[...new Set([raw,raw.trim()])].filter(x=>x&&!x.includes("/"));
+    let fichas=[];
+    for(const c of cands){
       const old=db.collection(COL).doc(c);
       const [fs,rs]=await Promise.all([old.collection("fichas").get(),old.collection("registos").get()]);
-      if(!fs.size&&!rs.size)continue;
-      let b=db.batch(),k=0;
-      const add=async(col,d)=>{b.set(base.collection(col).doc(d.id),d.data());if(++k>=400){await b.commit();b=db.batch();k=0}};
-      for(const d of fs.docs)await add("fichas",d);for(const d of rs.docs)await add("registos",d);
-      if(k)await b.commit();n+=fs.size;
-    }catch(e){return}
-  }
-  try{localStorage.setItem(key,"1")}catch(e){}
-  if(n)toast(n+" ficha(s) recuperadas da ligação anterior");
+      const regs=rs.docs.map(d=>({...d.data(),id:d.id}));
+      fs.docs.forEach(d=>fichas.push({...d.data(),id:d.id,reg:regs.filter(r=>r.fid===d.id)}));
+    }
+    if(fichas.length)await writeAll(mapToExisting(fichas));
+    await mk.set({feitaEm:new Date().toISOString(),fichas:fichas.length});
+    try{localStorage.setItem(key,"1")}catch(e){}
+  }catch(e){}
 }
 function connect(cfg,equipa){
   if(typeof firebase==="undefined"){setStatus("off","Sincronização indisponível aqui");return "A sincronização só funciona na versão publicada (GitHub Pages). Aqui a app grava apenas neste dispositivo."}
@@ -553,7 +560,7 @@ function connect(cfg,equipa){
     const app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
     const db=app.firestore();
     if(!connect._p){connect._p=true;db.enablePersistence({synchronizeTabs:true}).catch(()=>{})}
-    unsubs.forEach(u=>u());unsubs=[];cloudF={};cloudR={};gotF=gotR=false;
+    unsubs.forEach(u=>u());unsubs=[];cloudF={};cloudR={};gotF=gotR=false;resetReady();
     const raw=equipa; equipa=normEq(equipa);
     base=db.collection(COL).doc(teamId(equipa)); MODE="cloud"; DB={fichas:[]}; cur=null;
     setStatus("wait","A ligar à equipa "+equipa+"…");
@@ -583,6 +590,71 @@ function delFicha(f){
   const b=base.firestore.batch();b.delete(base.collection("fichas").doc(f.id));(f.reg||[]).forEach(r=>b.delete(base.collection("registos").doc(r.id)));b.commit();
 }
 let headTimer=null;
+/* ---- evitar duplicados: a ficha é identificada pelo código (ilha/iniciais/mês-ano) e o cagarro pelo código dentro da ficha ---- */
+const fKey=f=>[norm(f.ilha),norm(f.ini),+f.mes||0,+f.ano||0].join("|");
+const cKey=r=>String(r.cod??"").trim().toUpperCase();
+const regScore=r=>Object.entries(r).filter(([k,v])=>!["id","fid","ord"].includes(k)&&v!==""&&v!=null).length;
+function mapToExisting(fichas){
+  const byKey=new Map();DB.fichas.forEach(f=>{if(!byKey.has(fKey(f))||!f.fechada)byKey.set(fKey(f),f)});
+  const out=[];
+  for(const f of fichas){
+    const ex=byKey.get(fKey(f));
+    if(!ex){const nf={...f,reg:(f.reg||[]).map(r=>({...r}))};delete nf.exemplo;out.push(nf);byKey.set(fKey(nf),nf);continue}
+    if(ex.fechada)continue;
+    const regs=[];
+    for(const r of f.reg||[]){
+      const er=(ex.reg||[]).find(x=>cKey(x)===cKey(r));
+      if(!er){const nr={...r};(ex.reg=ex.reg||[]).push(nr);regs.push(nr)}
+      else if(regScore(r)>regScore(er)){Object.assign(er,{...r,id:er.id,ord:er.ord});regs.push(er)}
+    }
+    ["resp","tel","fobs"].forEach(k=>{if(!ex[k]&&f[k])ex[k]=f[k]});
+    out.push({...ex,reg:regs});
+  }
+  return out;
+}
+function dupPlan(){
+  const groups=new Map();DB.fichas.forEach(f=>{const k=fKey(f);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(f)});
+  const delF=[],delR=[],moveR=[],keepH=[];let nGroups=0;
+  for(const fs of groups.values()){
+    fs.sort((a,b)=>(b.fechada?1:0)-(a.fechada?1:0)||(b.reg.length-a.reg.length)||(a.criada||0)-(b.criada||0));
+    const keep=fs[0],best=new Map();
+    for(const f of fs)for(const r of f.reg){const c=cKey(r),cur0=best.get(c);
+      if(!cur0)best.set(c,{r,f});
+      else if(regScore(r)>regScore(cur0.r)){delR.push(cur0.r.id);best.set(c,{r,f})}
+      else delR.push(r.id)}
+    if(fs.length>1||delR.length){
+      if(fs.length>1)nGroups++;
+      for(const {r,f} of best.values())if(f.id!==keep.id)moveR.push({...r,fid:keep.id});
+      const h={...keep};let ch=false;fs.slice(1).forEach(f=>{["resp","tel","fobs"].forEach(k=>{if(!h[k]&&f[k]){h[k]=f[k];ch=true}});delF.push(f.id)});
+      if(ch)keepH.push(h);
+    }
+  }
+  return {delF,delR,moveR,keepH,nGroups};
+}
+async function applyDupPlan(pl){
+  if(MODE==="local"){
+    const delF=new Set(pl.delF),delR=new Set(pl.delR),mv=new Map(pl.moveR.map(r=>[r.id,r]));
+    const all=DB.fichas.flatMap(f=>f.reg.map(r=>({...r,fid:f.id})));
+    DB.fichas=DB.fichas.filter(f=>!delF.has(f.id)).map(f=>{const h=pl.keepH.find(x=>x.id===f.id);return {...(h||f),reg:[]}});
+    all.forEach(r=>{if(delR.has(r.id))return;const m=mv.get(r.id)||r;const f=DB.fichas.find(x=>x.id===m.fid);if(f){const {fid,...rr}=m;f.reg.push(rr)}});
+    save();return;
+  }
+  const db=base.firestore;let b=db.batch(),n=0;
+  const step=async()=>{if(++n>=400){await b.commit();b=db.batch();n=0}};
+  for(const id of pl.delR){b.delete(base.collection("registos").doc(id));await step()}
+  for(const r of pl.moveR){b.set(base.collection("registos").doc(r.id),r);await step()}
+  for(const h of pl.keepH){b.set(base.collection("fichas").doc(h.id),headerOnly(h));await step()}
+  for(const id of pl.delF){b.delete(base.collection("fichas").doc(id));await step()}
+  if(n)await b.commit();
+}
+function backupNow(){try{const blob=new Blob([JSON.stringify(DB,null,1)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="sos-cagarro-antes-limpeza-"+today()+".json";document.body.appendChild(a);a.click();a.remove()}catch(e){}}
+function showDupTool(){
+  const pl=dupPlan(),B=$("dupBox");
+  if(!pl.delF.length&&!pl.delR.length){B.innerHTML=`<div class="confirm" style="border-color:var(--ok)"><span style="flex:1">Não há fichas nem cagarros duplicados.</span><button class="btn" type="button" id="dupOk">Fechar</button></div>`;$("dupOk").onclick=()=>B.innerHTML="";return}
+  B.innerHTML=`<div class="confirm" style="border-color:var(--warn)"><span style="flex:1"><b>Duplicados encontrados:</b> ${pl.delF.length} ficha(s) repetida(s) em ${pl.nGroups} código(s) de ficha e ${pl.delR.length} cagarro(s) repetido(s).<br>Cada código de ficha fica com uma só ficha; em cada cagarro repetido mantém-se o registo mais completo. Antes de limpar é descarregada uma cópia de segurança.</span><button class="btn" type="button" id="dupNo2">Cancelar</button><button class="btn primary" type="button" id="dupGo">Remover duplicados</button></div>`;
+  $("dupNo2").onclick=()=>B.innerHTML="";
+  $("dupGo").onclick=async()=>{$("dupGo").disabled=true;backupNow();try{await applyDupPlan(pl);B.innerHTML="";showList();toast("Duplicados removidos")}catch(e){B.innerHTML=`<p class="err">Erro ao limpar: ${esc(e.code||e.message)}</p>`}};
+}
 function schedHead(){clearTimeout(headTimer);headTimer=setTimeout(()=>{headTimer=null;if(cur)putFicha(cur)},600)}
 function localFichas(){try{const d=JSON.parse(localStorage.getItem(KEY)||"null");return d&&Array.isArray(d.fichas)?d.fichas.filter(f=>!f.exemplo):[]}catch(e){return []}}
 const $=id=>document.getElementById(id);
@@ -608,7 +680,7 @@ function seed(){
 }
 function load(){
   try{const s=localStorage.getItem(KEY); if(s){DB=JSON.parse(s); if(!Array.isArray(DB.fichas))DB={fichas:[]}; return;}}catch(e){}
-  DB={fichas:[seed()]};
+  DB={fichas:[]};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}}
 function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2200)}
@@ -622,16 +694,16 @@ function showList(){cur=null;$("vFicha").hidden=true;$("vRel").hidden=true;$("vR
 function syncBanner(){
   const B=$("syncBanner");if(!B)return;let h="";
   if(MODE==="cloud"&&netState==="off")h=`<div class="confirm" style="border-color:var(--bad)"><span style="flex:1"><b>${esc($("syncTxt").textContent)}.</b> Os registos não estão a ser partilhados com os outros equipamentos.</span><button class="btn" type="button" data-act="sync">Ver ligação</button></div>`;
-  else if(MODE==="cloud"){const lf=localFichas();if(lf.length)h=`<div class="confirm" style="border-color:var(--warn)"><span style="flex:1"><b>${lf.length} ficha(s) estão só neste equipamento</b> (criadas antes de ligar à equipa). Os outros equipamentos não as veem até serem enviadas.</span><button class="btn primary" type="button" data-act="up">Enviar para a equipa</button></div>`}
+  else if(MODE==="cloud"){const lf=localFichas();if(lf.length)h=`<div class="confirm" style="border-color:var(--warn)"><span style="flex:1"><b>${lf.length} ficha(s) estão só neste equipamento</b> (criadas antes de ligar à equipa). Ao enviar, as fichas e cagarros que já existem na equipa não são repetidos.</span><button class="btn primary" type="button" data-act="up">Enviar para a equipa</button></div>`}
   else if(DB.fichas.some(f=>!f.exemplo))h=`<div class="confirm" style="border-color:var(--line)"><span style="flex:1">Este equipamento não está ligado a uma equipa. As fichas ficam só aqui.</span><button class="btn" type="button" data-act="sync">Ligar à equipa</button></div>`;
   B.innerHTML=h;B.hidden=!h;
   B.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>b.dataset.act==="up"?uploadLocal():$("btnSync").click());
 }
-async function uploadLocal(){const lf=localFichas();if(!lf.length)return;try{await writeAll(lf);
+async function uploadLocal(){const lf=localFichas();if(!lf.length)return;try{await readyP;await writeAll(mapToExisting(lf));
   try{const d=JSON.parse(localStorage.getItem(KEY));d.fichas=d.fichas.filter(f=>f.exemplo);localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}
   $("wrapUp").hidden=true;syncBanner();toast(lf.length+" ficha(s) enviadas para a equipa")}catch(e){toast("Erro ao enviar: "+(e.code||e.message))}}
 function renderList(){
-  syncBanner();
+  syncBanner();$("btnDup").hidden=!isDRPM();
   const L=$("listFichas");
   if(!VIS().length){L.innerHTML=`<div class="empty" style="grid-column:1/-1">Ainda não há fichas. Toque em <b>+ Nova ficha</b> para começar o registo de uma saída.</div>`;return}
   const fs=[...VIS()].sort((a,b)=>(b.ano-a.ano)||(b.mes-a.mes)||(b.criada-a.criada));
@@ -655,18 +727,31 @@ function renderFicha(){
   $("fCode").textContent=fichaCode(cur);
   $("cnt").textContent="";$("sumChips").innerHTML=chipsHTML(cur);
   const tb=$("tb");
-  if(!cur.reg.length){tb.innerHTML=`<tr><td colspan="18" style="text-align:center;color:var(--muted);padding:28px;cursor:default">Nenhum cagarro registado nesta ficha.${cur.fechada?"":" Use <b>+ Adicionar cagarro</b>."}</td></tr>`;return}
+  if(!cur.reg.length){tb.innerHTML=`<tr><td colspan="17" style="text-align:center;color:var(--muted);padding:28px;cursor:default">Nenhum cagarro registado nesta ficha.${cur.fechada?"":" Use <b>+ Adicionar cagarro</b>."}</td></tr>`;return}
   tb.innerHTML=cur.reg.map(r=>`<tr data-id="${r.id}">
-    <td class="code"><b>${esc(r.cod)}</b></td><td>${esc(r.orig)}</td><td style="white-space:normal;min-width:140px">${esc(r.gps)}</td><td>${fmtD(r.dsal)}</td>
+    <td class="code"><b>${esc(r.cod)}</b></td><td>${fmtD(r.dsal)}</td>
     <td><span class="st ${esc(r.estado)}"></span>${esc(r.estado)}</td><td>${r.anil==="Sim"?"Sim · <span class='code'>"+esc(r.anilha)+"</span>":esc(r.anil||"")}</td>
     <td class="code">${esc(r.nova)}</td><td>${fmtD(r.danil)}</td><td class="code">${esc(r.inianil)}</td>
     <td class="num">${esc(r.pen)}</td><td class="num">${esc(r.asa)}</td><td class="num">${esc(r.peso)}</td><td class="num">${esc(r.tarso)}</td><td class="num">${esc(r.culmen)}</td><td class="num">${esc(r.bico)}</td>
-    <td>${esc(r.sexo)}</td><td>${esc(r.llib)}${r.dlib?"<div class='sub'>"+fmtD(r.dlib)+"</div>":""}</td><td style="white-space:normal;min-width:120px">${esc(r.obs)}</td></tr>`).join("");
+    <td>${esc(r.sexo)}</td><td>${esc(r.idade)}</td><td>${esc(r.llib)}${r.dlib?"<div class='sub'>"+fmtD(r.dlib)+"</div>":""}</td><td style="white-space:normal;min-width:120px">${esc(r.obs)}</td></tr>`).join("");
   tb.querySelectorAll("tr[data-id]").forEach(tr=>tr.onclick=()=>openEditor(tr.dataset.id));
 }
+function checkSameCode(){
+  const cf=$("confFicha");const o=cur&&cur.ini?DB.fichas.find(x=>x.id!==cur.id&&fKey(x)===fKey(cur)):null;
+  if(!o){if(cf.dataset.same){cf.innerHTML="";delete cf.dataset.same}return}
+  cf.dataset.same="1";
+  cf.innerHTML=`<div class="confirm section" style="border-color:var(--warn)"><span style="flex:1">Já existe a ficha <b>${esc(fichaCode(o))}</b> com ${o.reg.length} cagarro(s)${o.fechada?" (fechada)":""}. Para não duplicar, ${cur.reg.length?"junte os registos nessa ficha":"continue nessa ficha"}.</span><button class="btn primary" type="button" id="sameGo">${cur.reg.length?"Juntar nessa ficha":"Abrir essa ficha"}</button></div>`;
+  $("sameGo").onclick=async()=>{const me=cur;delete cf.dataset.same;cf.innerHTML="";
+    if(me.reg.length&&!o.fechada){await writeAllOrLocal(mapToExisting([me]))}
+    if(!o.fechada||!me.reg.length){delFicha(me);DB.fichas=DB.fichas.filter(x=>x.id!==me.id)}
+    openFicha(o.id);toast("Aberta a ficha "+fichaCode(o))};
+}
+async function writeAllOrLocal(fs){if(MODE==="cloud")return writeAll(fs);save()}
 function bindHead(){
   [["h_ilha","ilha"],["h_ini","ini"],["h_mes","mes"],["h_ano","ano"],["h_resp","resp"],["h_tel","tel"],["h_obs","fobs"]].forEach(([id,k])=>{
-    $(id).addEventListener("input",()=>{if(!cur)return;let v=$(id).value;if(k==="mes"||k==="ano")v=v?+v:"";if(k==="ini")v=v.toUpperCase();cur[k]=v;delete cur.exemplo;$("fCode").textContent=fichaCode(cur);if(MODE==="local")save();else schedHead()});
+    $(id).addEventListener("input",()=>{if(!cur)return;let v=$(id).value;if(k==="mes"||k==="ano")v=v?+v:"";if(k==="ini")v=v.toUpperCase();cur[k]=v;delete cur.exemplo;$("fCode").textContent=fichaCode(cur);if(MODE==="local")save();else schedHead();
+      if(["ilha","ini","resp","tel"].includes(k)){try{const me=JSON.parse(localStorage.getItem("sosCagarro.eu")||"{}");me[k]=v;localStorage.setItem("sosCagarro.eu",JSON.stringify(me))}catch(e){}}
+      if(["ilha","ini","mes","ano"].includes(k))checkSameCode()});
   });
 }
 
@@ -674,8 +759,8 @@ function bindHead(){
 function seg(id,name,opts){$(id).innerHTML=opts.map((o,i)=>`<input type="radio" name="${name}" id="${name}_${i}" value="${esc(o)}"><label for="${name}_${i}">${esc(o)}</label>`).join("")}
 const getSeg=n=>{const e=document.querySelector(`input[name="${n}"]:checked`);return e?e.value:""};
 const setSeg=(n,v)=>document.querySelectorAll(`input[name="${n}"]`).forEach(e=>e.checked=e.value===v);
-const F=["cod","dsal","gps","anilha","nova","danil","inianil","pen","asa","peso","tarso","culmen","bico","llib","dlib","obs"];
-const fid={cod:"c_cod",dsal:"c_dsal",gps:"c_gps",anilha:"c_anilha",nova:"c_nova",danil:"c_danil",inianil:"c_inianil",pen:"c_pen",asa:"c_asa",peso:"c_peso",tarso:"c_tarso",culmen:"c_culmen",bico:"c_bico",llib:"c_llib",dlib:"c_dlib",obs:"c_obs"};
+const F=["cod","dsal","anilha","nova","danil","inianil","pen","asa","peso","tarso","culmen","bico","llib","dlib","obs"];
+const fid={cod:"c_cod",dsal:"c_dsal",anilha:"c_anilha",nova:"c_nova",danil:"c_danil",inianil:"c_inianil",pen:"c_pen",asa:"c_asa",peso:"c_peso",tarso:"c_tarso",culmen:"c_culmen",bico:"c_bico",llib:"c_llib",dlib:"c_dlib",obs:"c_obs"};
 function nextRing(){
   for(let i=cur.reg.length-1;i>=0;i--){const m=/^(.*?)(\d+)$/.exec(cur.reg[i].nova||"");if(m){
     let n=+m[2]+1,c;do{c=m[1]+String(n).padStart(m[2].length,"0");n++}while(ringUses(c,null).length&&n<+m[2]+500);return c}}
@@ -686,13 +771,13 @@ function openEditor(id){
   const r=id?cur.reg.find(x=>x.id===id):null;
   $("edTitle").textContent=r?`Cagarro ${r.cod}`:"Novo cagarro";
   $("edDel").hidden=!r; $("edSaveNext").hidden=!!r;
-  if(r){F.forEach(k=>$(fid[k]).value=r[k]??"");setSeg("orig",r.orig);setSeg("est",r.estado);setSeg("anil",r.anil);setSeg("sexo",r.sexo);$("hintNova").textContent=""}
+  if(r){F.forEach(k=>$(fid[k]).value=r[k]??"");setSeg("est",r.estado);setSeg("anil",r.anil);setSeg("sexo",r.sexo);setSeg("idade",r.idade||"");$("hintNova").textContent=""}
   else{
     F.forEach(k=>$(fid[k]).value="");
     const last=cur.reg[cur.reg.length-1];
     $("c_dsal").value=last?.dsal||today(); $("c_danil").value=today(); $("c_inianil").value=last?.inianil||cur.ini||"";
     const nr=nextRing(); $("c_nova").value=nr; $("hintNova").textContent=nr?"Sugerida a seguir à última anilha desta ficha":"";
-    setSeg("orig","");setSeg("est","Vivo");setSeg("anil","Não");setSeg("sexo","");
+    setSeg("est","Vivo");setSeg("anil","Não");setSeg("sexo","");setSeg("idade","");
   }
   $("wrapAnilha").hidden=getSeg("anil")!=="Sim";
   checkNova();checkRecap();
@@ -718,7 +803,7 @@ function saveEditor(again,force){
     $("confReg").scrollIntoView({block:"nearest"});return}
   const o={};F.forEach(k=>o[k]=$(fid[k]).value.trim());o.cod=cod;
   o.inianil=o.inianil.toUpperCase();o.nova=o.nova.toUpperCase();
-  o.orig=getSeg("orig");o.estado=getSeg("est");o.anil=getSeg("anil");o.sexo=getSeg("sexo");
+  o.estado=getSeg("est");o.anil=getSeg("anil");o.sexo=getSeg("sexo");o.idade=getSeg("idade");
   if(o.anil!=="Sim")o.anilha="";
   let rec;
   if(editId){rec=Object.assign(cur.reg.find(x=>x.id===editId),o)}else{o.id=uid();o.ord=Date.now();cur.reg.push(o);rec=o}
@@ -730,9 +815,9 @@ function saveEditor(again,force){
 
 /* ---- exportação ---- */
 function csvOf(f){
-  const H=["Ilha","Iniciais","Mês","Ano","Código ficha","Responsável","Contacto","Código cagarro","Origem","GPS / local","Data salvamento","Estado","Já anilhado","Nº anilha","Nova anilha","Data anilhagem","Iniciais anilhador","Penugem","Asa (mm)","Peso (g)","Tarso (mm)","Culmen (mm)","Bico (mm)","Sexo","Local libertação","Data libertação","Observações"];
+  const H=["Ilha","Iniciais","Mês","Ano","Código ficha","Responsável","Contacto","Código cagarro","Data salvamento","Estado","Já anilhado","Nº anilha","Nova anilha","Data anilhagem","Iniciais anilhador","Penugem","Asa (mm)","Peso (g)","Tarso (mm)","Culmen (mm)","Bico (mm)","Sexo","Idade","Local libertação","Data libertação","Observações"];
   const q=v=>{v=String(v??"");return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const rows=f.reg.map(r=>[f.ilha,f.ini,f.mes,f.ano,fichaCode(f),f.resp,f.tel,r.cod,r.orig,r.gps,fmtD(r.dsal),r.estado,r.anil,r.anilha,r.nova,fmtD(r.danil),r.inianil,r.pen,r.asa,r.peso,r.tarso,r.culmen,r.bico,r.sexo,r.llib,fmtD(r.dlib),r.obs]);
+  const rows=f.reg.map(r=>[f.ilha,f.ini,f.mes,f.ano,fichaCode(f),f.resp,f.tel,r.cod,fmtD(r.dsal),r.estado,r.anil,r.anilha,r.nova,fmtD(r.danil),r.inianil,r.pen,r.asa,r.peso,r.tarso,r.culmen,r.bico,r.sexo,r.idade,r.llib,fmtD(r.dlib),r.obs]);
   return [H,...rows].map(r=>r.map(q).join(";")).join("\n");
 }
 let bMode="backup", bName="";
@@ -756,7 +841,7 @@ function restore(txt){
     const q=MODE==="cloud"?`Enviar as ${d.fichas.length} fichas da cópia para a equipa? Fichas com o mesmo identificador são substituídas; as restantes mantêm-se.`:`Substituir as ${DB.fichas.length} fichas atuais pelas ${d.fichas.length} da cópia?`;
     $("bMsg").innerHTML=`<div class="confirm"><span style="flex:1">${q}</span><button class="btn" type="button" id="rNo">Cancelar</button><button class="btn primary" type="button" id="rYes">Restaurar</button></div>`;
     $("rNo").onclick=()=>$("bMsg").innerHTML="";
-    $("rYes").onclick=async()=>{if(MODE==="cloud"){try{await writeAll(d.fichas)}catch(e){$("bMsg").innerHTML=`<p class="err">Erro ao enviar: ${esc(e.code||e.message)}</p>`;return}}else{DB=d;save()}closeB();showList();toast("Cópia restaurada")};
+    $("rYes").onclick=async()=>{if(MODE==="cloud"){try{await writeAll(mapToExisting(d.fichas))}catch(e){$("bMsg").innerHTML=`<p class="err">Erro ao enviar: ${esc(e.code||e.message)}</p>`;return}}else{DB=d;save()}closeB();showList();toast("Cópia restaurada")};
   }catch(e){$("bMsg").innerHTML=`<p class="err">O texto não é uma cópia de segurança válida desta app.</p>`}
 }
 
@@ -776,9 +861,10 @@ function stats(a){const v=a.filter(x=>x!=null);if(!v.length)return {n:0,med:null
 function relData(rows){
   const cnt=(fn,keys)=>{const m={};(keys||[]).forEach(k=>m[k]=0);rows.forEach(x=>{const k=fn(x)||"Não indicado";m[k]=(m[k]||0)+1});return m};
   return {total:rows.length,
-    estado:cnt(x=>x.r.estado,EST), origem:cnt(x=>x.r.orig,ORIG), ilha:cnt(x=>x.f.ilha),
+    estado:cnt(x=>x.r.estado,EST), ilha:cnt(x=>x.f.ilha),
     dia:cnt(x=>x.r.dsal?fmtD(x.r.dsal):""), pen:cnt(x=>x.r.pen===""||x.r.pen==null?"":"Código "+x.r.pen,["Código 0","Código 1","Código 2","Código 3","Código 4"]),
     sexo:cnt(x=>x.r.sexo==="M"?"Macho":x.r.sexo==="F"?"Fêmea":"",["Macho","Fêmea"]),
+    idade:cnt(x=>x.r.idade,IDADES),
     novas:rows.filter(x=>x.r.nova).length, recap:rows.filter(x=>x.r.anil==="Sim").length, lib:rows.filter(x=>x.r.llib||x.r.dlib).length,
     bio:NUM.map(k=>({k,all:stats(rows.map(x=>toN(x.r[k]))),M:stats(rows.filter(x=>x.r.sexo==="M").map(x=>toN(x.r[k]))),F:stats(rows.filter(x=>x.r.sexo==="F").map(x=>toN(x.r[k])))}))};
 }
@@ -807,13 +893,13 @@ function renderRel(){
   $("relSub").textContent=relFilterText()+" · gerado em "+new Date().toLocaleDateString("pt-PT");
   const t=(c,v,l)=>`<div class="tile ${c}"><b>${v}</b><span>${l}</span></div>`;
   $("relTiles").innerHTML=t("",d.total,"Cagarros")+t("vivo",d.estado.Vivo,"Vivos")+t("ferido",d.estado.Ferido,"Feridos")+t("morto",d.estado.Morto,"Mortos")+t("",d.novas,"Anilhas novas")+t("",d.recap,"Já anilhados")+t("",d.lib,"Libertados");
-  $("relBars").innerHTML=barsHTML("Origem do salvamento",d.origem,true)+barsHTML("Por ilha",d.ilha)+barsHTML("Por dia de salvamento",d.dia)+barsHTML("Penugem",d.pen,true)+barsHTML("Sexo",d.sexo,true);
+  $("relBars").innerHTML=barsHTML("Por ilha",d.ilha)+barsHTML("Por dia de salvamento",d.dia)+barsHTML("Penugem",d.pen,true)+barsHTML("Sexo",d.sexo,true)+barsHTML("Idade",d.idade,true);
   const c=s=>s.n?`${nf(s.med)} <span class="sub">(${nf(s.min)}–${nf(s.max)}) n=${s.n}</span>`:"—";
   $("relBio").innerHTML=`<thead><tr><th>Medida</th><th>Todos</th><th>Machos</th><th>Fêmeas</th></tr></thead><tbody>`+
     d.bio.map(b=>`<tr style="cursor:default"><td><b>${NUML[b.k]}</b></td><td>${c(b.all)}</td><td>${c(b.M)}</td><td>${c(b.F)}</td></tr>`).join("")+"</tbody>";
   $("relCnt").textContent=`(${rows.length})`;
-  $("relTbl").innerHTML=`<thead><tr><th>Ficha</th><th>Código</th><th>Data salv.</th><th>Origem</th><th>Estado</th><th>Anilha</th><th class="num">Pen.</th><th class="num">Asa</th><th class="num">Peso</th><th class="num">Tarso</th><th class="num">Culmen</th><th class="num">Bico</th><th>Sexo</th><th>Libertação</th><th>Observações</th></tr></thead><tbody>`+
-    (rows.length?rows.map(({f,r})=>`<tr data-f="${f.id}" data-r="${r.id}"><td class="code">${esc(fichaCode(f))}</td><td class="code"><b>${esc(r.cod)}</b></td><td>${fmtD(r.dsal)}</td><td>${esc(r.orig)}</td><td><span class="st ${esc(r.estado)}"></span>${esc(r.estado)}</td><td class="code">${esc(r.nova||(r.anil==="Sim"?r.anilha+" (já)":""))}</td><td class="num">${esc(r.pen)}</td><td class="num">${esc(r.asa)}</td><td class="num">${esc(r.peso)}</td><td class="num">${esc(r.tarso)}</td><td class="num">${esc(r.culmen)}</td><td class="num">${esc(r.bico)}</td><td>${esc(r.sexo)}</td><td>${esc(r.llib)} ${fmtD(r.dlib)}</td><td style="white-space:normal;min-width:140px">${esc(r.obs)}</td></tr>`).join("")
+  $("relTbl").innerHTML=`<thead><tr><th>Ficha</th><th>Código</th><th>Data salv.</th><th>Estado</th><th>Anilha</th><th class="num">Pen.</th><th class="num">Asa</th><th class="num">Peso</th><th class="num">Tarso</th><th class="num">Culmen</th><th class="num">Bico</th><th>Sexo</th><th>Idade</th><th>Libertação</th><th>Observações</th></tr></thead><tbody>`+
+    (rows.length?rows.map(({f,r})=>`<tr data-f="${f.id}" data-r="${r.id}"><td class="code">${esc(fichaCode(f))}</td><td class="code"><b>${esc(r.cod)}</b></td><td>${fmtD(r.dsal)}</td><td><span class="st ${esc(r.estado)}"></span>${esc(r.estado)}</td><td class="code">${esc(r.nova||(r.anil==="Sim"?r.anilha+" (já)":""))}</td><td class="num">${esc(r.pen)}</td><td class="num">${esc(r.asa)}</td><td class="num">${esc(r.peso)}</td><td class="num">${esc(r.tarso)}</td><td class="num">${esc(r.culmen)}</td><td class="num">${esc(r.bico)}</td><td>${esc(r.sexo)}</td><td>${esc(r.idade)}</td><td>${esc(r.llib)} ${fmtD(r.dlib)}</td><td style="white-space:normal;min-width:140px">${esc(r.obs)}</td></tr>`).join("")
     :`<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:24px">Nenhum registo corresponde aos filtros.</td></tr>`)+"</tbody>";
   $("relTbl").querySelectorAll("tr[data-r]").forEach(tr=>tr.onclick=()=>openRecord(tr.dataset.f,tr.dataset.r));
 }
@@ -822,16 +908,16 @@ function showRel(){cur=null;$("vList").hidden=true;$("vFicha").hidden=true;$("vR
 /* ---- resumo / pesquisa ---- */
 function openRecord(fid,rid){cur=DB.fichas.find(f=>f.id===fid);if(cur)openEditor(rid)}
 let resSort={k:"dsal",dir:"desc"};
-const QF=["q_ilha","q_est","q_orig","q_ficha","q_resp","q_anilhador","q_anil","q_nova","q_pen","q_sexo","q_lib","q_de","q_ate","q_pmin","q_pmax","q_amin","q_amax"];
+const QF=["q_ilha","q_est","q_ficha","q_resp","q_anilhador","q_anil","q_nova","q_pen","q_sexo","q_idade","q_lib","q_de","q_ate","q_pmin","q_pmax","q_amin","q_amax"];
 function fillSel(id,opts,allLabel){const v=$(id).value;$(id).innerHTML=`<option value="">${allLabel||"Todos"}</option>`+opts.map(o=>Array.isArray(o)?`<option value="${esc(o[0])}">${esc(o[1])}</option>`:`<option>${esc(o)}</option>`).join("");if([...$(id).options].some(o=>o.value===v))$(id).value=v}
 function fillResFilters(){
   const rows=allRows(),uniq=a=>[...new Set(a.filter(Boolean))].sort((x,y)=>x.localeCompare(y,"pt"));
-  fillSel("q_ilha",ILHAS_VIS(),"Todas");fillSel("q_est",EST);fillSel("q_orig",ORIG,"Todas");
+  fillSel("q_ilha",ILHAS_VIS(),"Todas");fillSel("q_est",EST);
   fillSel("q_ficha",[...VIS()].sort((a,b)=>(b.ano-a.ano)||(b.mes-a.mes)).map(f=>[f.id,fichaCode(f)+(f.resp?" · "+f.resp:"")]),"Todas");
   fillSel("q_resp",uniq(VIS().map(f=>f.resp)));fillSel("q_anilhador",uniq(rows.map(x=>x.r.inianil)));
   fillSel("q_anil",["Sim","Não"]);fillSel("q_nova",[["s","Com nova anilha"],["n","Sem nova anilha"]]);
   fillSel("q_pen",[["0","0 · nenhuma"],["1","1"],["2","2"],["3","3"],["4","4"],["-","Não indicada"]],"Todas");
-  fillSel("q_sexo",[["M","Macho"],["F","Fêmea"],["-","Não indicado"]]);fillSel("q_lib",[["s","Libertado"],["n","Não libertado"]]);
+  fillSel("q_sexo",[["M","Macho"],["F","Fêmea"],["-","Não indicado"]]);fillSel("q_idade",[...IDADES,["-","Não indicada"]],"Todas");fillSel("q_lib",[["s","Libertado"],["n","Não libertado"]]);
 }
 function resRows(){
   const g=id=>$(id).value, t=norm($("q_txt").value);
@@ -839,7 +925,6 @@ function resRows(){
   return allRows().filter(({f,r})=>{
     if(g("q_ilha")&&f.ilha!==g("q_ilha"))return false;
     if(g("q_est")&&r.estado!==g("q_est"))return false;
-    if(g("q_orig")&&r.orig!==g("q_orig"))return false;
     if(g("q_ficha")&&f.id!==g("q_ficha"))return false;
     if(g("q_resp")&&f.resp!==g("q_resp"))return false;
     if(g("q_anilhador")&&r.inianil!==g("q_anilhador"))return false;
@@ -847,19 +932,20 @@ function resRows(){
     if(g("q_nova")==="s"&&!r.nova||g("q_nova")==="n"&&r.nova)return false;
     if(g("q_pen")&&(g("q_pen")==="-"?String(r.pen??"")!=="":String(r.pen??"")!==g("q_pen")))return false;
     if(g("q_sexo")&&(g("q_sexo")==="-"?!!r.sexo:r.sexo!==g("q_sexo")))return false;
+    if(g("q_idade")&&(g("q_idade")==="-"?!!r.idade:r.idade!==g("q_idade")))return false;
     const lib=!!(r.llib||r.dlib);if(g("q_lib")==="s"&&!lib||g("q_lib")==="n"&&lib)return false;
     if(g("q_de")&&!(r.dsal&&r.dsal>=g("q_de")))return false;
     if(g("q_ate")&&!(r.dsal&&r.dsal<=g("q_ate")))return false;
     const pe=toN(r.peso),as=toN(r.asa);
     if(pmin!=null&&!(pe!=null&&pe>=pmin)||pmax!=null&&!(pe!=null&&pe<=pmax))return false;
     if(amin!=null&&!(as!=null&&as>=amin)||amax!=null&&!(as!=null&&as<=amax))return false;
-    if(t){const hay=norm([r.cod,r.anilha,r.nova,r.gps,r.llib,r.obs,r.inianil,f.resp,f.ilha,fichaCode(f),f.fobs].join(" "));if(!hay.includes(t))return false}
+    if(t){const hay=norm([r.cod,r.anilha,r.nova,r.llib,r.obs,r.inianil,f.resp,f.ilha,fichaCode(f),f.fobs].join(" "));if(!hay.includes(t))return false}
     return true;
   });
 }
-const RCOLS=[["ilha","Ilha",x=>x.f.ilha],["ficha","Ficha",x=>fichaCode(x.f)],["cod","Código",x=>x.r.cod,"n"],["dsal","Data salv.",x=>x.r.dsal],["orig","Origem",x=>x.r.orig],["estado","Estado",x=>x.r.estado],
+const RCOLS=[["ilha","Ilha",x=>x.f.ilha],["ficha","Ficha",x=>fichaCode(x.f)],["cod","Código",x=>x.r.cod,"n"],["dsal","Data salv.",x=>x.r.dsal],["estado","Estado",x=>x.r.estado],
   ["anilha","Anilha",x=>x.r.nova||x.r.anilha],["inianil","Anilhador",x=>x.r.inianil],["pen","Pen.",x=>x.r.pen,"n"],["asa","Asa",x=>x.r.asa,"n"],["peso","Peso",x=>x.r.peso,"n"],["tarso","Tarso",x=>x.r.tarso,"n"],
-  ["culmen","Culmen",x=>x.r.culmen,"n"],["bico","Bico",x=>x.r.bico,"n"],["sexo","Sexo",x=>x.r.sexo],["dlib","Libertação",x=>x.r.dlib||x.r.llib],["obs","Obs.",x=>x.r.obs]];
+  ["culmen","Culmen",x=>x.r.culmen,"n"],["bico","Bico",x=>x.r.bico,"n"],["sexo","Sexo",x=>x.r.sexo],["idade","Idade",x=>x.r.idade],["dlib","Libertação",x=>x.r.dlib||x.r.llib],["obs","Obs.",x=>x.r.obs]];
 function renderRes(){
   let rows=resRows();
   const c=RCOLS.find(c=>c[0]===resSort.k)||RCOLS[3],m=resSort.dir==="desc"?-1:1;
@@ -869,13 +955,13 @@ function renderRes(){
   const nF=new Set(rows.map(x=>x.f.id)).size;
   const tl=(cl,v,l)=>`<div class="tile ${cl}"><b>${v}</b><span>${l}</span></div>`;
   $("resTiles").innerHTML=tl("",rows.length,`Registos · ${nF} ficha${nF===1?"":"s"}`)+tl("vivo",d.estado.Vivo,"Vivos")+tl("ferido",d.estado.Ferido,"Feridos")+tl("morto",d.estado.Morto,"Mortos")+tl("",d.novas,"Anilhas novas")+tl("",d.lib,"Libertados")+tl("",avg("peso"),"Peso médio (g)")+tl("",avg("asa"),"Asa média (mm)");
-  const nMore=["q_ficha","q_resp","q_anilhador","q_anil","q_nova","q_pen","q_sexo","q_lib","q_de","q_ate","q_pmin","q_pmax","q_amin","q_amax"].filter(id=>$(id).value).length;
+  const nMore=["q_ficha","q_resp","q_anilhador","q_anil","q_nova","q_pen","q_sexo","q_idade","q_lib","q_de","q_ate","q_pmin","q_pmax","q_amin","q_amax"].filter(id=>$(id).value).length;
   $("qMoreN").textContent=nMore?`(${nMore} ativo${nMore>1?"s":""})`:"";
   $("resTbl").innerHTML="<thead><tr>"+RCOLS.map(([k,l,,n])=>`<th class="sort${n?" num":""}" data-k="${k}"${resSort.k===k?` data-dir="${resSort.dir}"`:""}>${l}</th>`).join("")+"</tr></thead><tbody>"+
-    (rows.length?rows.map(({f,r})=>`<tr data-f="${f.id}" data-r="${r.id}"><td>${esc(f.ilha)}</td><td class="code">${esc(fichaCode(f))}</td><td class="code num"><b>${esc(r.cod)}</b></td><td>${fmtD(r.dsal)}</td><td>${esc(r.orig)}</td>
+    (rows.length?rows.map(({f,r})=>`<tr data-f="${f.id}" data-r="${r.id}"><td>${esc(f.ilha)}</td><td class="code">${esc(fichaCode(f))}</td><td class="code num"><b>${esc(r.cod)}</b></td><td>${fmtD(r.dsal)}</td>
       <td><span class="st ${esc(r.estado)}"></span>${esc(r.estado)}</td><td class="code">${esc(r.nova||(r.anil==="Sim"?r.anilha+" (já)":""))}</td><td class="code">${esc(r.inianil)}</td>
       <td class="num">${esc(r.pen)}</td><td class="num">${esc(r.asa)}</td><td class="num">${esc(r.peso)}</td><td class="num">${esc(r.tarso)}</td><td class="num">${esc(r.culmen)}</td><td class="num">${esc(r.bico)}</td>
-      <td>${esc(r.sexo)}</td><td>${esc(r.llib)}${r.dlib?" <span class='sub'>"+fmtD(r.dlib)+"</span>":""}</td><td style="white-space:normal;min-width:140px">${esc(r.obs)}</td></tr>`).join("")
+      <td>${esc(r.sexo)}</td><td>${esc(r.idade)}</td><td>${esc(r.llib)}${r.dlib?" <span class='sub'>"+fmtD(r.dlib)+"</span>":""}</td><td style="white-space:normal;min-width:140px">${esc(r.obs)}</td></tr>`).join("")
     :`<tr><td colspan="${RCOLS.length}" style="text-align:center;color:var(--muted);padding:24px;cursor:default">Nenhum registo corresponde aos critérios.</td></tr>`)+"</tbody>";
   $("resTbl").querySelectorAll("th.sort").forEach(th=>th.onclick=()=>{const k=th.dataset.k;resSort=resSort.k===k?{k,dir:resSort.dir==="asc"?"desc":"asc"}:{k,dir:"asc"};renderRes()});
   $("resTbl").querySelectorAll("tr[data-r]").forEach(tr=>tr.onclick=()=>openRecord(tr.dataset.f,tr.dataset.r));
@@ -886,9 +972,9 @@ function exportResX(){if(!needX())return;const rows=renderRes();const wb=XLSX.ut
 
 /* ---- Excel ---- */
 const XH=[["Ilha","ilha","f"],["Iniciais","ini","f"],["Mês","mes","f"],["Ano","ano","f"],["Código ficha","","code"],["Responsável","resp","f"],["Contacto","tel","f"],["Observações da ficha","fobs","f"],
-  ["Código cagarro","cod"],["Origem","orig"],["GPS / local","gps"],["Data salvamento","dsal","d"],["Estado","estado"],["Já anilhado","anil"],["Nº anilha","anilha"],
+  ["Código cagarro","cod"],["Data salvamento","dsal","d"],["Estado","estado"],["Já anilhado","anil"],["Nº anilha","anilha"],
   ["Nova anilha","nova"],["Data anilhagem","danil","d"],["Iniciais anilhador","inianil"],["Penugem","pen","n"],["Asa (mm)","asa","n"],["Peso (g)","peso","n"],
-  ["Tarso (mm)","tarso","n"],["Culmen (mm)","culmen","n"],["Bico (mm)","bico","n"],["Sexo","sexo"],["Local libertação","llib"],["Data libertação","dlib","d"],["Observações","obs"]];
+  ["Tarso (mm)","tarso","n"],["Culmen (mm)","culmen","n"],["Bico (mm)","bico","n"],["Sexo","sexo"],["Idade","idade"],["Local libertação","llib"],["Data libertação","dlib","d"],["Observações","obs"]];
 const isoToDate=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||"");return m?new Date(+m[1],+m[2]-1,+m[3]):""};
 function needX(){if(typeof XLSX==="undefined"){toast("Não foi possível carregar o módulo Excel. Verifique a ligação à internet.");return false}return true}
 function registosSheet(rows){
@@ -907,7 +993,7 @@ function exportFichaX(){if(!needX()||!cur)return;const wb=XLSX.utils.book_new();
 function exportRelX(){if(!needX())return;const rows=relRows(),d=relData(rows),wb=XLSX.utils.book_new();
   const res=[["SOS Cagarro — Relatório de salvamentos"],[relFilterText()],["Gerado em",new Date().toLocaleDateString("pt-PT")],[],
     ["Totais"],["Cagarros",d.total],...EST.map(e=>[e,d.estado[e]]),["Anilhas novas",d.novas],["Já anilhados",d.recap],["Libertados",d.lib],[],
-    ["Origem do salvamento","N.º"],...Object.entries(d.origem),[],["Ilha","N.º"],...Object.entries(d.ilha),[],["Penugem","N.º"],...Object.entries(d.pen),[],["Sexo","N.º"],...Object.entries(d.sexo),[],["Dia de salvamento","N.º"],...Object.entries(d.dia)];
+    ["Ilha","N.º"],...Object.entries(d.ilha),[],["Penugem","N.º"],...Object.entries(d.pen),[],["Sexo","N.º"],...Object.entries(d.sexo),[],["Idade","N.º"],...Object.entries(d.idade),[],["Dia de salvamento","N.º"],...Object.entries(d.dia)];
   const ws1=XLSX.utils.aoa_to_sheet(res);ws1["!cols"]=[{wch:28},{wch:12}];
   const r1=v=>v==null?"":Math.round(v*10)/10;
   const bio=[["Medida","Grupo","N.º","Média","Mínimo","Máximo"]];d.bio.forEach(b=>[["Todos",b.all],["Machos",b.M],["Fêmeas",b.F]].forEach(([g,s])=>bio.push([NUML[b.k],g,s.n,r1(s.med),r1(s.min),r1(s.max)])));
@@ -963,10 +1049,10 @@ function planImport(rows){
     delete f.exemplo;
     const s=v=>String(v??"").trim();
     const anilV=norm(o.anil);
-    const rec={cod:s(o.cod),orig:xOrig(o.orig),gps:s(o.gps),dsal:xDate(o.dsal,ano),estado:pick(o.estado,EST)||"Vivo",
+    const rec={cod:s(o.cod),dsal:xDate(o.dsal,ano),estado:pick(o.estado,EST)||"Vivo",
       anil:(["sim","s","x","yes","1"].includes(anilV)||s(o.anilha))?"Sim":"Não",anilha:s(o.anilha),nova:s(o.nova).toUpperCase(),danil:xDate(o.danil,ano),
       inianil:s(o.inianil).toUpperCase(),pen:s(o.pen).replace(/^[øØφΦ]$/,"0"),asa:s(o.asa),peso:s(o.peso),tarso:s(o.tarso),culmen:s(o.culmen),bico:s(o.bico),
-      sexo:(s(o.sexo).toUpperCase().match(/^[MF]/)||[""])[0],llib:s(o.llib),dlib:xDate(o.dlib,ano),obs:s(o.obs)};
+      sexo:(s(o.sexo).toUpperCase().match(/^[MF]/)||[""])[0],idade:pick(o.idade,IDADES),llib:s(o.llib),dlib:xDate(o.dlib,ano),obs:s(o.obs)};
     NUM.forEach(k=>{const n=toN(rec[k]);rec[k]=n==null?"":String(n)});
     const ex=f.reg.find(r=>String(r.cod)===rec.cod);
     if(ex){Object.assign(ex,rec);atual++}else{f.reg.push({...rec,id:uid(),ord:Date.now()+i});novos++}
@@ -1094,7 +1180,7 @@ function checkRecap(){
   if(!u.length){box.innerHTML=`<span>Anilha <b>${esc(v.toUpperCase())}</b> sem registos anteriores nesta app (primeira captura registada aqui).</span>`;box.hidden=false;return}
   box.innerHTML=`<span><b>Recaptura</b> · anilha ${esc(v.toUpperCase())} com ${u.length} registo(s) anterior(es):</span>`+u.map(({f,r})=>`<div class="it" data-f="${f.id}" data-r="${r.id}">
     <b>${fmtD(r.dsal)||"sem data"}</b> · ${esc(f.ilha||"")} · cagarro ${esc(r.cod)} (${esc(fichaCode(f))}) · ${esc(r.estado||"")}${norm(r.nova)===norm(v)?" · anilhado aqui":" · já anilhado"}
-    <div class="sub">${[r.peso&&"Peso "+r.peso+" g",r.asa&&"Asa "+r.asa+" mm",r.tarso&&"Tarso "+r.tarso,r.culmen&&"Culmen "+r.culmen,r.bico&&"Bico "+r.bico,r.sexo&&"Sexo "+r.sexo,(r.llib||r.dlib)&&"Libertado "+[r.llib,fmtD(r.dlib)].filter(Boolean).join(" ")].filter(Boolean).join(" · ")||"sem biometria"}</div></div>`).join("");
+    <div class="sub">${[r.peso&&"Peso "+r.peso+" g",r.asa&&"Asa "+r.asa+" mm",r.tarso&&"Tarso "+r.tarso,r.culmen&&"Culmen "+r.culmen,r.bico&&"Bico "+r.bico,r.sexo&&"Sexo "+r.sexo,r.idade&&"Idade "+r.idade,(r.llib||r.dlib)&&"Libertado "+[r.llib,fmtD(r.dlib)].filter(Boolean).join(" ")].filter(Boolean).join(" · ")||"sem biometria"}</div></div>`).join("");
   box.hidden=false;
   box.querySelectorAll(".it").forEach(it=>it.onclick=()=>{if(VIS().some(f=>f.id===it.dataset.f)){closeEditor();openRecord(it.dataset.f,it.dataset.r)}});
 }
@@ -1118,15 +1204,15 @@ function fichaPDF(f){
   doc.setFontSize(9);doc.setFont("helvetica","bold");doc.text("Responsável/Iniciais:",M,41);doc.setFont("helvetica","normal");
   doc.text(`${f.resp||""}${f.ini?", "+f.ini:""}`,M+35,41);doc.line(M+34,42,M+150,42);
   doc.setFont("helvetica","bold");doc.text("Contacto (telem.):",M+160,41);doc.setFont("helvetica","normal");doc.text(f.tel||"",M+190,41);doc.line(M+189,42,W-M,42);
-  const head=[["Código do Cagarro","Origem do Salvamento","Coordenadas GPS ou local exato","Data de Salvamento","Estado","Já anilhado? Nº anilha","Nova Anilha Atribuída","Data de Anilhagem","Iniciais Anilhador","Penugem","Asa (mm)","Peso (g)","Tarso (mm)","Culmen (mm)","Bico (mm)","Sexo","Local de Libertação / Data","Observações"]];
-  const body=(f.reg||[]).map(r=>[r.cod,r.orig,r.gps,fmtD(r.dsal),r.estado,r.anil==="Sim"?"Sim · "+(r.anilha||""):"Não",r.nova,fmtD(r.danil),r.inianil,r.pen,r.asa,r.peso,r.tarso,r.culmen,r.bico,r.sexo,[r.llib,fmtD(r.dlib)].filter(Boolean).join(" / "),r.obs].map(v=>v==null?"":String(v)));
-  doc.autoTable({head,body:body.length?body:[["","","","","","","","","","","","","","","","","",""]],startY:45,margin:{left:M,right:M,bottom:30},theme:"grid",
+  const head=[["Código do Cagarro","Data de Salvamento","Estado","Já anilhado? Nº anilha","Nova Anilha Atribuída","Data de Anilhagem","Iniciais Anilhador","Penugem","Asa (mm)","Peso (g)","Tarso (mm)","Culmen (mm)","Bico (mm)","Sexo","Idade","Local de Libertação / Data","Observações"]];
+  const body=(f.reg||[]).map(r=>[r.cod,fmtD(r.dsal),r.estado,r.anil==="Sim"?"Sim · "+(r.anilha||""):"Não",r.nova,fmtD(r.danil),r.inianil,r.pen,r.asa,r.peso,r.tarso,r.culmen,r.bico,r.sexo,r.idade,[r.llib,fmtD(r.dlib)].filter(Boolean).join(" / "),r.obs].map(v=>v==null?"":String(v)));
+  doc.autoTable({head,body:body.length?body:[Array(17).fill("")],startY:45,margin:{left:M,right:M,bottom:30},theme:"grid",
     styles:{font:"helvetica",fontSize:7,cellPadding:1.3,lineColor:40,lineWidth:.2,textColor:20,valign:"middle",minCellHeight:9},
     headStyles:{fillColor:[235,235,235],textColor:20,fontStyle:"bold",fontSize:6.3,halign:"center",minCellHeight:11},
-    columnStyles:{0:{cellWidth:13,fontStyle:"bold",halign:"center"},1:{cellWidth:20},2:{cellWidth:24},3:{cellWidth:14,halign:"center"},4:{cellWidth:12},5:{cellWidth:16},6:{cellWidth:17},7:{cellWidth:14,halign:"center"},8:{cellWidth:11,halign:"center"},9:{cellWidth:11,halign:"center"},10:{cellWidth:11,halign:"right"},11:{cellWidth:11,halign:"right"},12:{cellWidth:11,halign:"right"},13:{cellWidth:12,halign:"right"},14:{cellWidth:11,halign:"right"},15:{cellWidth:9,halign:"center"},16:{cellWidth:24},17:{cellWidth:"auto"}},
+    columnStyles:{0:{cellWidth:14,fontStyle:"bold",halign:"center"},1:{cellWidth:16,halign:"center"},2:{cellWidth:13},3:{cellWidth:20},4:{cellWidth:19},5:{cellWidth:16,halign:"center"},6:{cellWidth:13,halign:"center"},7:{cellWidth:12,halign:"center"},8:{cellWidth:12,halign:"right"},9:{cellWidth:12,halign:"right"},10:{cellWidth:12,halign:"right"},11:{cellWidth:13,halign:"right"},12:{cellWidth:12,halign:"right"},13:{cellWidth:10,halign:"center"},14:{cellWidth:17,halign:"center"},15:{cellWidth:32},16:{cellWidth:"auto"}},
     didDrawPage:d=>{
       const y=210-27;doc.setFont("helvetica","normal");doc.setFontSize(6.6);doc.setTextColor(40);
-      doc.text("Código da penugem: 0 – nenhuma; 1 – só cabeça; cabeça + pescoço; só barriga; 2 – cabeça e barriga ou pescoço e barriga; 3 – barriga, cabeça e costas; 4 – barriga, cabeça, costas e asas. Entrega em PE: Ponto de Entrega.",M,y);
+      doc.text("Código da penugem: 0 – nenhuma; 1 – só cabeça; cabeça + pescoço; só barriga; 2 – cabeça e barriga ou pescoço e barriga; 3 – barriga, cabeça e costas; 4 – barriga, cabeça, costas e asas.",M,y);
       doc.text("Para mais informações contacte cagarro@azores.gov.pt ou o 800 292 800. Esta ficha de registo deverá ser guardada pelos Parques Naturais de Ilha e remetida para a Direção Regional de Políticas Marítimas.",M,y+4);
       if(f.fobs){doc.setFont("helvetica","bold");doc.text("Observações da ficha:",M,y+9);doc.setFont("helvetica","normal");doc.text(doc.splitTextToSize(f.fobs,W-2*M-30).slice(0,2),M+28,y+9)}
       const fe=f.fechada&&f.fechadaEm?"Ficha fechada em "+new Date(f.fechadaEm).toLocaleString("pt-PT",{dateStyle:"short",timeStyle:"short"})+" · ":"";
@@ -1141,12 +1227,14 @@ function pdfFicha(){if(!cur||!needPDF())return;try{fichaPDF(cur).save(pdfName(cu
 function init(){
   $("h_ilha").innerHTML=`<option value="">—</option>`+ILHAS.map(i=>`<option>${i}</option>`).join("");
   $("h_mes").innerHTML=`<option value="">—</option>`+MESES.map((m,i)=>`<option value="${i+1}">${m}</option>`).join("");
-  seg("seg_orig","orig",ORIG);seg("seg_est","est",EST);seg("seg_anil","anil",["Não","Sim"]);seg("seg_sexo","sexo",["M","F"]);
+  seg("seg_est","est",EST);seg("seg_anil","anil",["Não","Sim"]);seg("seg_sexo","sexo",["M","F"]);seg("seg_idade","idade",IDADES);
   document.querySelectorAll('input[name="anil"]').forEach(e=>e.onchange=()=>{$("wrapAnilha").hidden=getSeg("anil")!=="Sim";if(getSeg("anil")==="Sim")$("c_anilha").focus()});
   bindHead();
   $("goHome").onclick=showList;$("btnVoltar").onclick=showList;
-  $("btnNovaFicha").onclick=()=>{const t=new Date();const vf=VIS();const prev=vf[vf.length-1];
-    const f={id:uid(),ilha:PERFIL.ilha||(prev&&!prev.exemplo?prev.ilha:""),ini:prev&&!prev.exemplo?prev.ini:"",mes:t.getMonth()+1,ano:t.getFullYear(),resp:prev&&!prev.exemplo?prev.resp:"",tel:prev&&!prev.exemplo?prev.tel:"",criada:Date.now(),reg:[]};
+  $("btnNovaFicha").onclick=()=>{const t=new Date();let me={};try{me=JSON.parse(localStorage.getItem("sosCagarro.eu")||"{}")}catch(e){}
+    const f={id:uid(),ilha:PERFIL.ilha||me.ilha||"",ini:me.ini||"",mes:t.getMonth()+1,ano:t.getFullYear(),resp:me.resp||"",tel:me.tel||"",criada:Date.now(),reg:[]};
+    const ex=f.ini&&DB.fichas.find(x=>!x.fechada&&fKey(x)===fKey(f));
+    if(ex){openFicha(ex.id);toast("A ficha "+fichaCode(ex)+" já existe — aberta para continuar");return}
     DB.fichas.push(f);putFicha(f);openFicha(f.id)};
   $("btnAddCag").onclick=()=>openEditor(null);
   $("edClose").onclick=closeEditor;
@@ -1224,7 +1312,7 @@ function init(){
     else{$("ovInst").hidden=false;document.body.style.overflow="hidden"}};
   $("instClose").onclick=()=>{$("ovInst").hidden=true;document.body.style.overflow=""};
 
-  $("btnPDF").onclick=pdfFicha;$("btnFechar").onclick=toggleFecho;
+  $("btnPDF").onclick=pdfFicha;$("btnDup").onclick=showDupTool;$("btnFechar").onclick=toggleFecho;
   $("c_nova").addEventListener("input",checkNova);$("c_anilha").addEventListener("input",checkRecap);
   document.querySelectorAll('input[name="anil"]').forEach(e=>e.addEventListener("change",()=>{
     if(!editId&&getSeg("anil")==="Sim"&&$("c_nova").value===nextRing()){$("c_nova").value="";$("hintNova").textContent="Cagarro já anilhado: deixe vazio, salvo se colocar anilha nova.";checkNova()}
