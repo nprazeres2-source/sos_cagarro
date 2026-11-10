@@ -468,6 +468,189 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ===== ACESSO COM CONTA — Firebase Authentication (projeto equip-campo) =====
+   Só quem tiver conta confirmada E estiver na lista de acessos desta app
+   consegue ler/gravar na base de dados. A lista é gerida pelo administrador
+   (botão 👤 no canto inferior esquerdo → Gerir acessos).                    */
+const ACESSO=(()=>{
+ const ADMIN='nuno.mm.prazeres@azores.gov.pt';
+ const APPS={equipamento:'Equipamento de Campo',diario:'Diário de Viatura',cagarro:'SOS Cagarro'};
+ const SDK='https://www.gstatic.com/firebasejs/10.12.2/';
+ let prom=null,key='',auth=null,db=null,feito=null,ui=null,user=null,ehAdmin=false;
+ const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const LSK=()=>'acesso.ok.'+key;
+ const lerOk=()=>{try{return localStorage.getItem(LSK())||''}catch(e){return ''}};
+ const guardarOk=em=>{try{localStorage.setItem(LSK(),em)}catch(e){}};
+ const esquecerOk=()=>{try{localStorage.removeItem(LSK())}catch(e){}};
+ function carregar(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('sem rede'))};document.head.appendChild(s)})}
+ async function sdk(){
+  if(typeof firebase==='undefined')await carregar(SDK+'firebase-app-compat.js');
+  if(!firebase.auth)await carregar(SDK+'firebase-auth-compat.js');
+  if(!firebase.firestore)await carregar(SDK+'firebase-firestore-compat.js');
+ }
+ function montar(){
+  if(ui)return ui;
+  const st=document.createElement('style');
+  st.textContent=`#acx{position:fixed;inset:0;z-index:2147483000;background:rgba(12,18,16,.88);display:flex;align-items:center;justify-content:center;padding:16px;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1b1f1d;text-align:left}
+#acx[hidden],#acxChip[hidden]{display:none!important}
+#acx .c{background:#fff;border-radius:14px;max-width:390px;width:100%;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.45);max-height:92vh;overflow:auto;box-sizing:border-box}
+#acx h2{margin:0 0 6px;font-size:19px;color:#1b1f1d}#acx p{margin:8px 0;color:#3d4440}
+#acx label{display:block;margin:12px 0 4px;font-size:13px;font-weight:600;color:#333}
+#acx input,#acx textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #b9c0bc;border-radius:9px;font:inherit;color:#111;background:#fff}
+#acx textarea{min-height:84px;font-size:13px;resize:vertical}
+#acx button{display:block;font:inherit;border:0;border-radius:9px;padding:11px 14px;cursor:pointer;margin-top:12px;width:100%}
+#acx button:disabled{opacity:.6}
+#acx .p{background:#1f6f4a;color:#fff;font-weight:600}#acx .s{background:#e9eeeb;color:#1b1f1d}
+#acx .l{background:none;color:#1f6f4a;padding:6px;margin-top:4px;text-decoration:underline}
+#acx .e{color:#b3261e;font-size:14px;margin-top:8px;min-height:1em}#acx .ok{color:#1f6f4a}
+#acxChip{position:fixed;left:8px;bottom:8px;z-index:2147482000;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:99px;padding:5px 11px;font:12px system-ui,sans-serif;cursor:pointer;max-width:55vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media print{#acx,#acxChip{display:none!important}}`;
+  document.head.appendChild(st);
+  const d=document.createElement('div');d.id='acx';d.hidden=true;
+  d.innerHTML='<div class="c" role="dialog" aria-modal="true"></div>';
+  const chip=document.createElement('button');chip.id='acxChip';chip.type='button';chip.hidden=true;chip.title='Conta';chip.onclick=()=>menu();
+  document.body.append(d,chip);
+  ui={d,c:d.firstChild,chip};return ui;
+ }
+ const $c=s=>ui.c.querySelector(s);
+ function ecra(html){montar();ui.c.innerHTML=html;ui.d.hidden=false;const i=ui.c.querySelector('input');if(i)setTimeout(()=>i.focus(),60)}
+ function fechar(){if(ui)ui.d.hidden=true}
+ function erro(e){
+  const m={'auth/invalid-credential':'Email ou palavra-passe errados.','auth/invalid-login-credentials':'Email ou palavra-passe errados.','auth/wrong-password':'Email ou palavra-passe errados.','auth/user-not-found':'Email ou palavra-passe errados.','auth/invalid-email':'Email inválido.','auth/missing-email':'Escreva o email.','auth/missing-password':'Escreva a palavra-passe.','auth/email-already-in-use':'Já existe uma conta com este email. Use "Entrar".','auth/weak-password':'A palavra-passe precisa de pelo menos 6 caracteres.','auth/too-many-requests':'Demasiadas tentativas. Aguarde uns minutos.','auth/network-request-failed':'Sem ligação à internet.','auth/user-disabled':'Esta conta foi desativada.'};
+  return m[e&&e.code]||('Erro: '+((e&&(e.code||e.message))||e));
+ }
+ function sair(){auth.signOut().then(()=>location.reload())}
+
+ function ecraLogin(modo){
+  const criar=modo==='criar';
+  ecra(`<h2>${h(APPS[key])}</h2>
+<p>${criar?'Criar conta nova. Depois confirme o email e peça acesso ao administrador.':'Entre com a sua conta. Se já usa a Rampa-P, é a mesma conta.'}</p>
+<form novalidate><label for="acxEm">Email</label><input id="acxEm" type="email" name="em" autocomplete="username" autocapitalize="off">
+<label for="acxPw">Palavra-passe</label><input id="acxPw" type="password" name="pw" autocomplete="${criar?'new-password':'current-password'}">
+${criar?'<label for="acxPw2">Repetir palavra-passe</label><input id="acxPw2" type="password" name="pw2" autocomplete="new-password">':''}
+<div class="e"></div><button class="p" type="submit">${criar?'Criar conta':'Entrar'}</button></form>
+${criar?'<button class="l" type="button" data-a="entrar">Já tenho conta</button>':'<button class="l" type="button" data-a="criar">Criar conta</button><button class="l" type="button" data-a="rec">Esqueci-me da palavra-passe</button>'}`);
+  const f=$c('form'),er=$c('.e'),F=f.elements;
+  f.onsubmit=async ev=>{
+   ev.preventDefault();er.textContent='';
+   const em=F.em.value.trim(),pw=F.pw.value;
+   if(criar&&pw!==F.pw2.value){er.textContent='As palavras-passe não coincidem.';return}
+   const b=f.querySelector('button');b.disabled=true;
+   try{
+    if(criar){const r=await auth.createUserWithEmailAndPassword(em,pw);await r.user.sendEmailVerification();ecraVerificar(r.user)}
+    else await auth.signInWithEmailAndPassword(em,pw);
+   }catch(e){er.textContent=erro(e);b.disabled=false}
+  };
+  ui.c.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{
+   const a=b.dataset.a;
+   if(a!=='rec')return ecraLogin(a);
+   const em=F.em.value.trim();
+   if(!em){er.textContent='Escreva o seu email e carregue outra vez em "Esqueci-me".';return}
+   try{await auth.sendPasswordResetEmail(em);er.innerHTML='<span class="ok">Se a conta existir, recebe um email para definir nova palavra-passe.</span>'}
+   catch(e){er.textContent=erro(e)}
+  });
+ }
+
+ function ecraVerificar(u){
+  ecra(`<h2>Confirme o seu email</h2>
+<p>Enviámos uma mensagem para <b>${h(u.email)}</b>. Abra o link que lá está (veja também o spam) e depois carregue em "Já confirmei".</p>
+<div class="e"></div><button class="p" type="button" data-a="ok">Já confirmei</button>
+<button class="s" type="button" data-a="re">Enviar outra vez</button><button class="l" type="button" data-a="out">Sair / usar outra conta</button>`);
+  const er=$c('.e');
+  $c('[data-a=ok]').onclick=async()=>{
+   try{await u.reload();const c=auth.currentUser;
+    if(c&&c.emailVerified){await c.getIdToken(true);verificarAcesso(c)}
+    else er.textContent='O email ainda não aparece como confirmado.'}
+   catch(e){er.textContent=erro(e)}
+  };
+  $c('[data-a=re]').onclick=async()=>{try{await u.sendEmailVerification();er.innerHTML='<span class="ok">Email enviado.</span>'}catch(e){er.textContent=erro(e)}};
+  $c('[data-a=out]').onclick=sair;
+ }
+
+ async function verificarAcesso(u){
+  const em=(u.email||'').toLowerCase();
+  if(em===ADMIN)return pronto(u,true);
+  ecra('<h2>A verificar acesso…</h2>');
+  try{
+   const d=await db.collection('apps_config').doc('acessos').get();
+   const lista=((d.exists&&d.data()[key])||[]).map(x=>String(x).toLowerCase());
+   if(lista.includes(em)){guardarOk(em);return pronto(u,false)}
+   esquecerOk();semAcesso(em);
+  }catch(e){
+   if(e.code==='permission-denied'){esquecerOk();return semAcesso(em)}
+   if(lerOk()===em)return pronto(u,false); // sem rede, mas já tinha acesso confirmado neste equipamento
+   ecra(`<h2>Sem ligação</h2><p>Não foi possível confirmar o acesso. Verifique a internet.</p>
+<button class="p" type="button" data-a="r">Tentar outra vez</button><button class="l" type="button" data-a="out">Sair</button>`);
+   $c('[data-a=r]').onclick=()=>verificarAcesso(u);$c('[data-a=out]').onclick=sair;
+  }
+ }
+ function semAcesso(em){
+  ecra(`<h2>Sem acesso</h2><p>A conta <b>${h(em)}</b> ainda não tem acesso a <b>${h(APPS[key])}</b>.</p>
+<p>Peça ao administrador para a acrescentar e depois carregue em "Tentar outra vez".</p>
+<button class="p" type="button" data-a="r">Tentar outra vez</button><button class="l" type="button" data-a="out">Sair / usar outra conta</button>`);
+  $c('[data-a=r]').onclick=()=>verificarAcesso(auth.currentUser);$c('[data-a=out]').onclick=sair;
+ }
+ function pronto(u,adm){
+  user=u;ehAdmin=adm;fechar();
+  ui.chip.textContent='👤 '+u.email;ui.chip.hidden=false;
+  if(feito){const f=feito;feito=null;f(u)}
+ }
+
+ function menu(){
+  if(!user)return;
+  ecra(`<h2>Conta</h2><p>${h(user.email)}${ehAdmin?' · administrador':''}</p>
+${ehAdmin?'<button class="s" type="button" data-a="g">Gerir acessos</button>':''}
+<button class="s" type="button" data-a="out">Terminar sessão</button><button class="p" type="button" data-a="x">Fechar</button>`);
+  if(ehAdmin)$c('[data-a=g]').onclick=gerir;
+  $c('[data-a=out]').onclick=()=>{if(confirm('Terminar sessão neste equipamento?'))sair()};
+  $c('[data-a=x]').onclick=fechar;
+ }
+ async function gerir(){
+  ecra('<h2>A carregar…</h2>');
+  const ref=db.collection('apps_config').doc('acessos');let d={};
+  try{const s=await ref.get({source:'server'});d=s.exists?s.data():{}}
+  catch(e){ecra(`<h2>Gerir acessos</h2><p class="e">Não foi possível ler a lista (${h(e.code||e.message)}). É preciso internet.</p><button class="p" type="button" data-a="x">Fechar</button>`);$c('[data-a=x]').onclick=fechar;return}
+  ecra(`<h2>Gerir acessos</h2><p>Um email por linha. Cada pessoa cria a sua conta na app e confirma o email; depois basta estar aqui na lista.</p>
+${Object.entries(APPS).map(([k,n])=>`<label>${h(n)}</label><textarea data-k="${k}" spellcheck="false" autocapitalize="off">${h((d[k]||[]).join('\n'))}</textarea>`).join('')}
+<div class="e"></div><button class="p" type="button" data-a="s">Guardar</button><button class="l" type="button" data-a="x">Fechar</button>`);
+  const er=$c('.e');
+  $c('[data-a=x]').onclick=fechar;
+  $c('[data-a=s]').onclick=async()=>{
+   const o={alteradoEm:new Date().toISOString()};
+   ui.c.querySelectorAll('textarea').forEach(t=>{o[t.dataset.k]=[...new Set(t.value.split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))]});
+   try{await ref.set(o,{merge:true});er.innerHTML='<span class="ok">Lista guardada.</span>'}
+   catch(e){er.textContent='Erro ao guardar: '+(e.code||e.message)}
+  };
+ }
+
+ /* Chamar antes de ligar ao Firestore. Resolve quando há sessão autorizada
+    (ou com null se o Firebase não carregar por falta de rede — a app segue no modo local). */
+ function entrar(cfg,k){
+  if(prom)return prom;
+  key=k;
+  prom=new Promise(res=>{
+   feito=res;
+   (async()=>{
+    montar();ecra('<h2>A ligar…</h2>');
+    try{await sdk()}catch(e){fechar();feito=null;res(null);return}
+    const app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
+    auth=firebase.auth(app);auth.languageCode='pt';
+    db=firebase.firestore(app);
+    try{await db.enablePersistence({synchronizeTabs:true})}catch(e){}
+    auth.onAuthStateChanged(u=>{
+     if(!u){if(user){location.reload();return}ecraLogin('entrar');return}
+     if(user)return;
+     if(!u.emailVerified){ecraVerificar(u);return}
+     verificarAcesso(u);
+    });
+   })();
+  });
+  return prom;
+ }
+ return {entrar};
+})();
+</script>
 
 <script>
 const ILHAS=["Santa Maria","São Miguel","Terceira","Graciosa","São Jorge","Pico","Faial","Flores","Corvo"];
@@ -559,7 +742,6 @@ function connect(cfg,equipa){
   try{
     const app=firebase.apps.length?firebase.app():firebase.initializeApp(cfg);
     const db=app.firestore();
-    if(!connect._p){connect._p=true;db.enablePersistence({synchronizeTabs:true}).catch(()=>{})}
     unsubs.forEach(u=>u());unsubs=[];cloudF={};cloudR={};gotF=gotR=false;resetReady();
     const raw=equipa; equipa=normEq(equipa);
     base=db.collection(COL).doc(teamId(equipa)); MODE="cloud"; DB={fichas:[]}; cur=null;
@@ -1271,8 +1453,10 @@ function init(){
     const err=m=>{$("sErr").textContent=m;$("sErr").hidden=false};
     if(!cfg)return err("Cole a configuração Firebase (precisa pelo menos de apiKey e projectId).");
     if(normEq(eq).length<6)return err("O código da equipa precisa de 6 ou mais caracteres.");
-    const m=connect(cfg,eq); if(m)return err(m);
-    setSyncCfg({cfg:FIREBASE_CONFIG?null:cfg,equipa:eq}); closeS(); showList(); toast("Ligado à equipa "+eq);
+    ACESSO.entrar(cfg,"cagarro").then(()=>{
+      const m=connect(cfg,eq); if(m)return err(m);
+      setSyncCfg({cfg:FIREBASE_CONFIG?null:cfg,equipa:eq}); closeS(); showList(); toast("Ligado à equipa "+eq);
+    });
   };
   $("sOff").onclick=()=>{disconnect();closeS();toast("Desligado — a gravar só neste dispositivo")};
   $("sUp").onclick=uploadLocal;
@@ -1322,10 +1506,17 @@ function init(){
 
   load();
   const sc=syncCfg(), cfg=FIREBASE_CONFIG||sc.cfg, eqAuto=sc.equipa||(FIREBASE_CONFIG&&!sc.off?EQUIPA_FIXA:"");
-  if(cfg&&eqAuto){const m=connect(cfg,eqAuto);if(m)toast(m);else if(!sc.equipa)setSyncCfg({cfg:null,equipa:eqAuto})}
+  const arranque=()=>{
+    if(!PERFIL.key){PERFIL={};savePerfil();showPerfil();openPerfil(true)}
+    else if(MODE==="cloud")validatePerfil();
+  };
   showList();
-  if(!PERFIL.key){PERFIL={};savePerfil();showPerfil();openPerfil(true)}
-  else if(MODE==="cloud")validatePerfil();
+  if(cfg&&eqAuto){
+    ACESSO.entrar(cfg,"cagarro").then(()=>{
+      const m=connect(cfg,eqAuto);if(m)toast(m);else if(!sc.equipa)setSyncCfg({cfg:null,equipa:eqAuto});
+      showList();arranque();
+    });
+  }else arranque();
 }
 init();
 </script>
