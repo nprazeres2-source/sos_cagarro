@@ -24,6 +24,7 @@
   --bg:#eef2f3; --surface:#ffffff; --ink:#18303a; --muted:#5b707a; --line:#d3dde1;
   --accent:#e8b923; --accent-ink:#2a2206; --sea:#1f5468; --sea-soft:#e2edf1;
   --ok:#2f7d4f; --warn:#b06a10; --bad:#b23a3a;
+  --v-vivo:#1baf7a; --v-ferido:#eb6834; --v-morto:#6250d6; --v-m:#2a78d6; --v-f:#eb6834; --v-bar:#2a78d6;
   --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -31,11 +32,13 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0f1a1f; --surface:#16252c; --ink:#e3ecef; --muted:#93a8b1; --line:#2a3d46;
   --accent:#f0c63c; --accent-ink:#1d1704; --sea:#7fb6cb; --sea-soft:#1b323b;
-  --ok:#6cc18f; --warn:#e2a24a; --bad:#e57878; color-scheme:dark}}
+  --ok:#6cc18f; --warn:#e2a24a; --bad:#e57878;
+  --v-vivo:#199e70; --v-ferido:#d95926; --v-morto:#9085e9; --v-m:#3987e5; --v-f:#d95926; --v-bar:#3987e5; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0f1a1f; --surface:#16252c; --ink:#e3ecef; --muted:#93a8b1; --line:#2a3d46;
   --accent:#f0c63c; --accent-ink:#1d1704; --sea:#7fb6cb; --sea-soft:#1b323b;
-  --ok:#6cc18f; --warn:#e2a24a; --bad:#e57878; color-scheme:dark}
+  --ok:#6cc18f; --warn:#e2a24a; --bad:#e57878;
+  --v-vivo:#199e70; --v-ferido:#d95926; --v-morto:#9085e9; --v-m:#3987e5; --v-f:#d95926; --v-bar:#3987e5; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;margin:0}
@@ -147,6 +150,25 @@ label.f > span.warnbox{text-transform:none;letter-spacing:0;font-weight:500;font
 .serie{font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
 .tag-closed{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;background:var(--ink);color:var(--surface);padding:2px 7px;border-radius:4px}
 .lockbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--sea-soft);border:1px solid var(--sea);border-radius:10px;padding:12px 14px;font-weight:600}
+.chartcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.chartcard.wide{grid-column:1/-1}
+#relCharts{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:760px){#relCharts{grid-template-columns:minmax(0,1fr)}}
+.chartcard h3{margin:0}
+.chartcard .csub{font-size:13px;color:var(--muted);margin:-4px 0 0}
+.chart{width:100%;min-height:60px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:var(--f-body);font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.chart .lbl{fill:var(--ink);font-weight:600}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .axis{stroke:var(--muted);stroke-width:1}
+.chart [data-tip]:hover{opacity:.85}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--ink)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.legend i.dot{border-radius:50%}
+.vtip{position:fixed;z-index:60;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;line-height:1.35;padding:7px 10px;border-radius:8px;max-width:240px;box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:pre-line}
+.tile small{display:block;font-size:13px;font-weight:600;color:var(--muted);letter-spacing:0;text-transform:none;margin-top:2px}
 .relgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
 .bars{display:grid;gap:8px}
 .bar{display:grid;grid-template-columns:minmax(0,1fr) 2fr 34px;gap:8px;align-items:center;font-size:14px}
@@ -184,7 +206,7 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
   <nav class="tabs noprint" aria-label="Secções">
     <button type="button" class="tab" data-v="list" id="tabList">Fichas</button>
     <button type="button" class="tab" data-v="res" id="tabRes">Resumo</button>
-    <button type="button" class="tab" data-v="rel" id="tabRel">Relatórios</button>
+    <button type="button" class="tab" data-v="rel" id="tabRel">Estatística</button>
   </nav>
   <!-- RESUMO / PESQUISA -->
   <section id="vRes" hidden>
@@ -243,9 +265,9 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
       <button class="btn ghost" id="btnRelVoltar" type="button">← Fichas</button>
       <span class="spacer"></span>
       <button class="btn" id="btnRelPrint" type="button">Imprimir</button>
-      <button class="btn primary" id="btnRelX" type="button">Exportar relatório Excel</button>
+      <button class="btn primary" id="btnRelX" type="button">Exportar estatística Excel</button>
     </div>
-    <div class="section"><h1>Relatório de salvamentos</h1><p class="sub" id="relSub" style="margin:4px 0 0"></p></div>
+    <div class="section"><h1>Estatística de salvamentos</h1><p class="sub" id="relSub" style="margin:4px 0 0"></p></div>
     <div class="section panel grid g-head noprint">
       <label class="f"><span>De (data salv.)</span><input type="date" id="r_de"></label>
       <label class="f"><span>Até</span><input type="date" id="r_ate"></label>
@@ -254,8 +276,9 @@ footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
       <label class="f"><span>Estado</span><select id="r_est"></select></label>
     </div>
     <div class="section tiles" id="relTiles"></div>
+    <div class="section relgrid" id="relCharts"></div>
     <div class="section relgrid" id="relBars"></div>
-    <div class="section"><h2>Biometria</h2><p class="sub" style="margin:2px 0 10px">Média (mínimo–máximo) e número de medições.</p>
+    <div class="section"><h2>Biometria</h2><p class="sub" style="margin:2px 0 10px">Média (mínimo–máximo) e número de medições, por sexo e por idade.</p>
       <div class="tbl-wrap"><table id="relBio"></table></div></div>
     <div class="section"><h2>Registos <span class="sub" id="relCnt"></span></h2>
       <div class="tbl-wrap" style="margin-top:10px"><table id="relTbl"></table></div></div>
@@ -1072,7 +1095,7 @@ function restore(txt){
   }catch(e){$("bMsg").innerHTML=`<p class="err">O texto não é uma cópia de segurança válida desta app.</p>`}
 }
 
-/* ---- relatórios ---- */
+/* ---- estatística ---- */
 const NUM=["asa","peso","tarso","culmen","bico"];
 const NUML={asa:"Asa (mm)",peso:"Peso (g)",tarso:"Tarso (mm)",culmen:"Culmen (mm)",bico:"Bico (mm)"};
 const toN=v=>{if(v===""||v==null)return null;const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:null};
@@ -1093,7 +1116,7 @@ function relData(rows){
     sexo:cnt(x=>x.r.sexo==="M"?"Macho":x.r.sexo==="F"?"Fêmea":"",["Macho","Fêmea"]),
     idade:cnt(x=>x.r.idade,IDADES),
     novas:rows.filter(x=>x.r.nova).length, recap:rows.filter(x=>x.r.anil==="Sim").length, lib:rows.filter(x=>x.r.llib||x.r.dlib).length,
-    bio:NUM.map(k=>({k,all:stats(rows.map(x=>toN(x.r[k]))),M:stats(rows.filter(x=>x.r.sexo==="M").map(x=>toN(x.r[k]))),F:stats(rows.filter(x=>x.r.sexo==="F").map(x=>toN(x.r[k])))}))};
+    bio:NUM.map(k=>({k,all:stats(rows.map(x=>toN(x.r[k]))),M:stats(rows.filter(x=>x.r.sexo==="M").map(x=>toN(x.r[k]))),F:stats(rows.filter(x=>x.r.sexo==="F").map(x=>toN(x.r[k]))),J:stats(rows.filter(x=>x.r.idade==="Juvenil").map(x=>toN(x.r[k]))),A:stats(rows.filter(x=>x.r.idade==="Adulto").map(x=>toN(x.r[k])))}))};
 }
 function relFilterText(){
   const p=[];const de=$("r_de").value,ate=$("r_ate").value;
@@ -1115,21 +1138,111 @@ function barsHTML(title,m,keepZero){
   const e=Object.entries(m).filter(([k,v])=>keepZero||v);const mx=Math.max(1,...e.map(x=>x[1]));
   return `<div class="panel"><h3 style="margin-bottom:12px">${title}</h3><div class="bars">${e.length?e.map(([k,v])=>`<div class="bar"><span class="lb" title="${esc(k)}">${esc(k)}</span><span class="tr"><span class="fl" style="display:block;width:${v/mx*100}%"></span></span><span class="v">${v}</span></div>`).join(""):'<span class="sub">Sem dados</span>'}</div></div>`;
 }
+/* gráficos (SVG desenhado à largura do ecrã) */
+const VCOL={Vivo:"var(--v-vivo)",Ferido:"var(--v-ferido)",Morto:"var(--v-morto)"};
+function niceStep(max,n){const raw=Math.max(max,1)/n,p=Math.pow(10,Math.floor(Math.log10(raw))),m=raw/p;return (m<=1?1:m<=2?2:m<=5?5:10)*p}
+function topRounded(x,y,w,h,r){if(h<=0||w<=0)return "";r=Math.min(r,w/2,h);return `M${x},${y+h}V${y+r}Q${x},${y} ${x+r},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+h}Z`}
+function rightRounded(x,y,w,h,r){if(h<=0||w<=0)return "";r=Math.min(r,h/2,w);return `M${x},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+h-r}Q${x+w},${y+h} ${x+w-r},${y+h}H${x}Z`}
+const legendHTML=items=>`<div class="legend">${items.map(([c,l,dot])=>`<span><i class="${dot?"dot":""}" style="background:${c}"></i>${esc(l)}</span>`).join("")}</div>`;
+const noData='<p class="sub" style="margin:8px 0">Sem dados para os filtros escolhidos.</p>';
+function chartCard(id,title,sub,wide,legend){return `<div class="chartcard${wide?" wide":""}"><h3>${title}</h3>${sub?`<p class="csub">${sub}</p>`:""}${legend||""}<div class="chart" id="${id}"></div></div>`}
+function vbW(el){return Math.max(280,Math.round(el.clientWidth||600))}
+
+function drawDays(el,rows){
+  const by=new Map();rows.forEach(({r})=>{if(!r.dsal)return;if(!by.has(r.dsal))by.set(r.dsal,{Vivo:0,Ferido:0,Morto:0});const o=by.get(r.dsal);if(o[r.estado]!=null)o[r.estado]++});
+  if(!by.size){el.innerHTML=noData;return}
+  const days=[...by.keys()].sort(),W=vbW(el),H=220,ml=34,mr=8,mt=18,mb=34,iw=W-ml-mr,ih=H-mt-mb;
+  const tot=d=>EST.reduce((s,e)=>s+by.get(d)[e],0),max=Math.max(...days.map(tot)),st=niceStep(max,4),top=Math.ceil(max/st)*st||st;
+  const bw=iw/days.length,gap=Math.min(8,bw*.3),w=Math.max(2,Math.min(48,bw-gap)),y=v=>mt+ih-v/top*ih;
+  let g="";for(let v=0;v<=top;v+=st)g+=`<line class="grid" x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`;
+  const every=Math.max(1,Math.ceil(days.length/Math.max(1,Math.floor(iw/46))));
+  days.forEach((d,i)=>{const x=ml+i*bw+(bw-w)/2;let acc=0;const o=by.get(d),t=tot(d);
+    const segs=EST.filter(e=>o[e]);
+    segs.forEach((e,j)=>{const y0=y(acc+o[e]),h=y(acc)-y0-(j?2:0);acc+=o[e];
+      const path=j===segs.length-1?topRounded(x,y0,w,h,Math.min(4,w/2)):`M${x},${y0}h${w}v${h}h${-w}Z`;
+      g+=`<path d="${path}" fill="${VCOL[e]}" data-tip="${esc(fmtD(d))} · ${e}: ${o[e]} de ${t}"/>`});
+    if(days.length<=16)g+=`<text class="lbl" x="${x+w/2}" y="${y(t)-5}" text-anchor="middle">${t}</text>`;
+    if(i%every===0)g+=`<text x="${x+w/2}" y="${H-mb+16}" text-anchor="middle">${esc(fmtD(d).slice(0,5))}</text>`});
+  g+=`<line class="axis" x1="${ml}" x2="${W-mr}" y1="${y(0)}" y2="${y(0)}"/>`;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cagarros salvos por dia, por estado">${g}</svg>`;
+}
+function drawIlhas(el,rows){
+  const by=new Map();rows.forEach(({f,r})=>{const k=f.ilha||"Sem ilha";if(!by.has(k))by.set(k,{Vivo:0,Ferido:0,Morto:0});const o=by.get(k);if(o[r.estado]!=null)o[r.estado]++});
+  if(!by.size){el.innerHTML=noData;return}
+  const tot=k=>EST.reduce((s,e)=>s+by.get(k)[e],0),ks=[...by.keys()].sort((a,b)=>tot(b)-tot(a));
+  const W=vbW(el),lw=Math.min(96,W*.28),mr=36,rh=24,gap=10,H=ks.length*(rh+gap),iw=W-lw-mr,max=Math.max(...ks.map(tot));
+  let g="";ks.forEach((k,i)=>{const y0=i*(rh+gap),o=by.get(k),t=tot(k);let acc=0;
+    g+=`<text class="lbl" x="${lw-8}" y="${y0+rh/2+4}" text-anchor="end">${esc(k)}</text>`;
+    const segs=EST.filter(e=>o[e]);
+    segs.forEach((e,j)=>{const x=lw+acc/max*iw+(j?2:0),w=o[e]/max*iw-(j?2:0);acc+=o[e];
+      const path=j===segs.length-1?rightRounded(x,y0,w,rh,4):`M${x},${y0}h${w}v${rh}h${-w}Z`;
+      g+=`<path d="${path}" fill="${VCOL[e]}" data-tip="${esc(k)} · ${e}: ${o[e]} (${Math.round(o[e]/t*100)}%)"/>`});
+    g+=`<text class="lbl" x="${lw+t/max*iw+6}" y="${y0+rh/2+4}">${t}</text>`});
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cagarros por ilha e estado">${g}</svg>`;
+}
+function drawHist(el,vals,bw,unit,label){
+  vals=vals.filter(v=>v!=null);if(!vals.length){el.innerHTML=noData;return}
+  const lo=Math.floor(Math.min(...vals)/bw)*bw,hi=Math.floor(Math.max(...vals)/bw)*bw,bins=[];
+  for(let b=lo;b<=hi+1e-9;b+=bw)bins.push({b,n:0});vals.forEach(v=>bins[Math.min(bins.length-1,Math.floor((v-lo)/bw+1e-9))].n++);
+  const W=vbW(el),H=190,ml=30,mr=8,mt=14,mb=34,iw=W-ml-mr,ih=H-mt-mb,max=Math.max(...bins.map(x=>x.n)),st=niceStep(max,4),top=Math.ceil(max/st)*st||st;
+  const cw=iw/bins.length,y=v=>mt+ih-v/top*ih;let g="";
+  for(let v=0;v<=top;v+=st)g+=`<line class="grid" x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`;
+  const every=Math.max(1,Math.ceil(bins.length/Math.max(1,Math.floor(iw/44))));
+  bins.forEach((x,i)=>{const X=ml+i*cw+1,w=Math.max(1,cw-2);
+    if(x.n)g+=`<path d="${topRounded(X,y(x.n),w,y(0)-y(x.n),Math.min(4,w/2))}" fill="var(--v-bar)" data-tip="${label} ${nf(x.b,1)}–${nf(x.b+bw,1)} ${unit}: ${x.n} cagarro(s)"/>`;
+    if(i%every===0)g+=`<text x="${X}" y="${H-mb+16}">${nf(x.b,1)}</text>`});
+  g+=`<line class="axis" x1="${ml}" x2="${W-mr}" y1="${y(0)}" y2="${y(0)}"/><text x="${W-mr}" y="${H-4}" text-anchor="end">${unit}</text>`;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Distribuição de ${label}">${g}</svg>`;
+}
+function drawScatter(el,rows){
+  const pts=rows.map(({f,r})=>({x:toN(r.asa),y:toN(r.peso),s:r.sexo,r,f})).filter(p=>p.x!=null&&p.y!=null);
+  if(pts.length<2){el.innerHTML=noData;return}
+  const W=vbW(el),H=250,ml=40,mr=10,mt=30,mb=36,iw=W-ml-mr,ih=H-mt-mb;
+  const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),sx=niceStep(Math.max(...xs)-Math.min(...xs)||10,4),sy=niceStep(Math.max(...ys)-Math.min(...ys)||100,4);
+  const x0=Math.floor(Math.min(...xs)/sx)*sx,x1=Math.max(Math.ceil(Math.max(...xs)/sx)*sx,x0+sx),y0=Math.floor(Math.min(...ys)/sy)*sy,y1=Math.max(Math.ceil(Math.max(...ys)/sy)*sy,y0+sy);
+  const X=v=>ml+(v-x0)/(x1-x0)*iw,Y=v=>mt+ih-(v-y0)/(y1-y0)*ih;let g="";
+  for(let v=y0;v<=y1+1e-9;v+=sy)g+=`<line class="grid" x1="${ml}" x2="${W-mr}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${ml-6}" y="${Y(v)+4}" text-anchor="end">${nf(v,0)}</text>`;
+  for(let v=x0;v<=x1+1e-9;v+=sx)g+=`<text x="${X(v)}" y="${H-mb+16}" text-anchor="middle">${nf(v,0)}</text>`;
+  g+=`<line class="axis" x1="${ml}" x2="${W-mr}" y1="${mt+ih}" y2="${mt+ih}"/><text x="${W-mr}" y="${H-4}" text-anchor="end">Asa (mm)</text><text x="${ml-6}" y="${mt-16}" text-anchor="start">Peso (g)</text>`;
+  const col=s=>s==="M"?"var(--v-m)":s==="F"?"var(--v-f)":"var(--muted)";
+  [...pts].sort((a,b)=>(a.s?1:0)-(b.s?1:0)).forEach(p=>g+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="5" fill="${col(p.s)}" stroke="var(--surface)" stroke-width="2" fill-opacity="${p.s?1:.6}" data-tip="Cagarro ${esc(p.r.cod)} · ${p.s==="M"?"macho":p.s==="F"?"fêmea":"sexo não indicado"}${p.r.idade?" · "+esc(p.r.idade.toLowerCase()):""}&#10;Asa ${nf(p.x)} mm · Peso ${nf(p.y,0)} g"/>`);
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Asa e peso de cada cagarro, por sexo">${g}</svg>`;
+}
+function vizTips(root){
+  let tip=$("vtip");if(!tip){tip=document.createElement("div");tip.id="vtip";tip.className="vtip";tip.hidden=true;document.body.appendChild(tip)}
+  const place=e=>{const x=Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8),y=e.clientY-tip.offsetHeight-12;tip.style.left=Math.max(8,x)+"px";tip.style.top=(y<8?e.clientY+18:y)+"px"};
+  root.querySelectorAll("[data-tip]").forEach(m=>{
+    m.addEventListener("pointerenter",e=>{tip.textContent=m.dataset.tip;tip.hidden=false;place(e)});
+    m.addEventListener("pointermove",place);m.addEventListener("pointerleave",()=>tip.hidden=true)});
+}
 function renderRel(){
   const rows=relRows(),d=relData(rows);
   $("relSub").textContent=relFilterText()+" · gerado em "+new Date().toLocaleDateString("pt-PT");
-  const t=(c,v,l)=>`<div class="tile ${c}"><b>${v}</b><span>${l}</span></div>`;
-  $("relTiles").innerHTML=t("",d.total,"Cagarros")+t("vivo",d.estado.Vivo,"Vivos")+t("ferido",d.estado.Ferido,"Feridos")+t("morto",d.estado.Morto,"Mortos")+t("",d.novas,"Anilhas novas")+t("",d.recap,"Já anilhados")+t("",d.lib,"Libertados");
-  $("relBars").innerHTML=barsHTML("Por ilha",d.ilha)+barsHTML("Por dia de salvamento",d.dia)+barsHTML("Penugem",d.pen,true)+barsHTML("Sexo",d.sexo,true)+barsHTML("Idade",d.idade,true);
+  const pc=(n,t)=>t?Math.round(n/t*100)+"%":"—";
+  const vivosLib=rows.filter(x=>x.r.estado!=="Morto").length;
+  const t=(c,v,l,sm)=>`<div class="tile ${c}"><b>${v}</b><span>${l}</span>${sm?`<small>${sm}</small>`:""}</div>`;
+  $("relTiles").innerHTML=t("",d.total,"Cagarros",new Set(rows.map(x=>x.f.id)).size+" ficha(s)")+t("vivo",d.estado.Vivo,"Vivos",pc(d.estado.Vivo,d.total))+t("ferido",d.estado.Ferido,"Feridos",pc(d.estado.Ferido,d.total))+t("morto",d.estado.Morto,"Mortos",pc(d.estado.Morto,d.total))
+    +t("",d.novas,"Anilhas novas",pc(d.novas,d.total))+t("",d.recap,"Recapturas",pc(d.recap,d.total))+t("",d.lib,"Libertados",pc(d.lib,vivosLib)+" dos vivos e feridos");
+  const leg=legendHTML(EST.map(e=>[VCOL[e],e]));
+  $("relCharts").innerHTML=chartCard("chDias","Salvamentos por dia","Número de cagarros por data de salvamento, por estado.",true,leg)
+    +chartCard("chIlhas","Por ilha","Total por ilha, dividido por estado.",false,leg)
+    +chartCard("chDisp","Asa e peso","Cada ponto é um cagarro com asa e peso medidos.",false,legendHTML([["var(--v-m)","Macho",1],["var(--v-f)","Fêmea",1],["var(--muted)","Sexo não indicado",1]]))
+    +chartCard("chPeso","Distribuição do peso","Número de cagarros por intervalo de 50 g.",false)
+    +chartCard("chAsa","Distribuição da asa","Número de cagarros por intervalo de 5 mm.",false);
+  drawDays($("chDias"),rows);drawIlhas($("chIlhas"),rows);drawScatter($("chDisp"),rows);
+  drawHist($("chPeso"),rows.map(x=>toN(x.r.peso)),50,"g","Peso");drawHist($("chAsa"),rows.map(x=>toN(x.r.asa)),5,"mm","Asa");
+  vizTips($("relCharts"));
+  $("relBars").innerHTML=barsHTML("Penugem",d.pen,true)+barsHTML("Sexo",d.sexo,true)+barsHTML("Idade",d.idade,true);
   const c=s=>s.n?`${nf(s.med)} <span class="sub">(${nf(s.min)}–${nf(s.max)}) n=${s.n}</span>`:"—";
-  $("relBio").innerHTML=`<thead><tr><th>Medida</th><th>Todos</th><th>Machos</th><th>Fêmeas</th></tr></thead><tbody>`+
-    d.bio.map(b=>`<tr style="cursor:default"><td><b>${NUML[b.k]}</b></td><td>${c(b.all)}</td><td>${c(b.M)}</td><td>${c(b.F)}</td></tr>`).join("")+"</tbody>";
+  $("relBio").innerHTML=`<thead><tr><th>Medida</th><th>Todos</th><th>Machos</th><th>Fêmeas</th><th>Juvenis</th><th>Adultos</th></tr></thead><tbody>`+
+    d.bio.map(b=>`<tr style="cursor:default"><td><b>${NUML[b.k]}</b></td><td>${c(b.all)}</td><td>${c(b.M)}</td><td>${c(b.F)}</td><td>${c(b.J)}</td><td>${c(b.A)}</td></tr>`).join("")+"</tbody>";
   $("relCnt").textContent=`(${rows.length})`;
   $("relTbl").innerHTML=`<thead><tr><th>Ficha</th><th>Código</th><th>Data salv.</th><th>Estado</th><th>Anilha</th><th class="num">Pen.</th><th class="num">Asa</th><th class="num">Peso</th><th class="num">Tarso</th><th class="num">Culmen</th><th class="num">Bico</th><th>Sexo</th><th>Idade</th><th>Libertação</th><th>Observações</th></tr></thead><tbody>`+
     (rows.length?rows.map(({f,r})=>`<tr data-f="${f.id}" data-r="${r.id}"><td class="code">${esc(fichaCode(f))}</td><td class="code"><b>${esc(r.cod)}</b></td><td>${fmtD(r.dsal)}</td><td><span class="st ${esc(r.estado)}"></span>${esc(r.estado)}</td><td class="code">${esc(r.nova||(r.anil==="Sim"?r.anilha+" (já)":""))}</td><td class="num">${esc(r.pen)}</td><td class="num">${esc(r.asa)}</td><td class="num">${esc(r.peso)}</td><td class="num">${esc(r.tarso)}</td><td class="num">${esc(r.culmen)}</td><td class="num">${esc(r.bico)}</td><td>${esc(r.sexo)}</td><td>${esc(r.idade)}</td><td>${esc(r.llib)} ${fmtD(r.dlib)}</td><td style="white-space:normal;min-width:140px">${esc(r.obs)}</td></tr>`).join("")
     :`<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:24px">Nenhum registo corresponde aos filtros.</td></tr>`)+"</tbody>";
   $("relTbl").querySelectorAll("tr[data-r]").forEach(tr=>tr.onclick=()=>openRecord(tr.dataset.f,tr.dataset.r));
 }
+let relRsz=null;window.addEventListener("resize",()=>{clearTimeout(relRsz);relRsz=setTimeout(()=>{if(!$("vRel").hidden)renderRel()},200)});
 function showRel(){cur=null;$("vList").hidden=true;$("vFicha").hidden=true;$("vRes").hidden=true;$("vRel").hidden=false;setTab("rel");fillRelFilters();renderRel();window.scrollTo(0,0)}
 
 /* ---- resumo / pesquisa ---- */
@@ -1217,16 +1330,17 @@ function exportFichaX(){if(!needX()||!cur)return;const wb=XLSX.utils.book_new();
   capa["!cols"]=[{wch:20},{wch:30}];
   XLSX.utils.book_append_sheet(wb,registosSheet(cur.reg.map(r=>({f:cur,r}))),"Registos");XLSX.utils.book_append_sheet(wb,capa,"Ficha");
   saveWB(wb,"SOS_Cagarro_"+fichaCode(cur).replace(/\//g,"_")+".xlsx")}
+function porDia(rows){const m=new Map();rows.forEach(({r})=>{const k=r.dsal||"";if(!m.has(k))m.set(k,{t:0,Vivo:0,Ferido:0,Morto:0});const o=m.get(k);o.t++;if(o[r.estado]!=null)o[r.estado]++});return [...m.keys()].sort().map(k=>[k?fmtD(k):"Sem data",m.get(k).t,m.get(k).Vivo,m.get(k).Ferido,m.get(k).Morto])}
 function exportRelX(){if(!needX())return;const rows=relRows(),d=relData(rows),wb=XLSX.utils.book_new();
-  const res=[["SOS Cagarro — Relatório de salvamentos"],[relFilterText()],["Gerado em",new Date().toLocaleDateString("pt-PT")],[],
+  const res=[["SOS Cagarro — Estatística de salvamentos"],[relFilterText()],["Gerado em",new Date().toLocaleDateString("pt-PT")],[],
     ["Totais"],["Cagarros",d.total],...EST.map(e=>[e,d.estado[e]]),["Anilhas novas",d.novas],["Já anilhados",d.recap],["Libertados",d.lib],[],
-    ["Ilha","N.º"],...Object.entries(d.ilha),[],["Penugem","N.º"],...Object.entries(d.pen),[],["Sexo","N.º"],...Object.entries(d.sexo),[],["Idade","N.º"],...Object.entries(d.idade),[],["Dia de salvamento","N.º"],...Object.entries(d.dia)];
+    ["Ilha","N.º"],...Object.entries(d.ilha),[],["Penugem","N.º"],...Object.entries(d.pen),[],["Sexo","N.º"],...Object.entries(d.sexo),[],["Idade","N.º"],...Object.entries(d.idade),[],["Dia de salvamento","Total","Vivos","Feridos","Mortos"],...porDia(rows)];
   const ws1=XLSX.utils.aoa_to_sheet(res);ws1["!cols"]=[{wch:28},{wch:12}];
   const r1=v=>v==null?"":Math.round(v*10)/10;
-  const bio=[["Medida","Grupo","N.º","Média","Mínimo","Máximo"]];d.bio.forEach(b=>[["Todos",b.all],["Machos",b.M],["Fêmeas",b.F]].forEach(([g,s])=>bio.push([NUML[b.k],g,s.n,r1(s.med),r1(s.min),r1(s.max)])));
+  const bio=[["Medida","Grupo","N.º","Média","Mínimo","Máximo"]];d.bio.forEach(b=>[["Todos",b.all],["Machos",b.M],["Fêmeas",b.F],["Juvenis",b.J],["Adultos",b.A]].forEach(([g,s])=>bio.push([NUML[b.k],g,s.n,r1(s.med),r1(s.min),r1(s.max)])));
   const ws2=XLSX.utils.aoa_to_sheet(bio);ws2["!cols"]=[{wch:14},{wch:10},{wch:6},{wch:8},{wch:8},{wch:8}];
   XLSX.utils.book_append_sheet(wb,ws1,"Resumo");XLSX.utils.book_append_sheet(wb,ws2,"Biometria");XLSX.utils.book_append_sheet(wb,registosSheet(rows),"Registos");
-  saveWB(wb,"SOS_Cagarro_relatorio_"+today()+".xlsx")}
+  saveWB(wb,"SOS_Cagarro_estatistica_"+today()+".xlsx")}
 
 /* importação */
 const norm=s=>String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
